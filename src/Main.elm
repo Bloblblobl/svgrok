@@ -4,8 +4,7 @@ import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput)
-import List exposing (append)
-import Parser exposing (..)
+import Parser exposing ((|.), (|=))
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 
@@ -23,9 +22,12 @@ main =
         }
 
 
-type PathPositioning
-    = Absolute
-    | Relative
+type alias PathPoint =
+    { x : Float, y : Float }
+
+
+type alias PathPointPair =
+    { start : PathPoint, end : PathPoint }
 
 
 type PathArcSize
@@ -38,25 +40,83 @@ type PathArcRotation
     | CounterClockwise
 
 
-type alias PathPoint =
-    { x : Float, y : Float }
+type alias PathArcParameters =
+    { radii : PathPoint
+    , angle : Float
+    , size : PathArcSize
+    , rotation : PathArcRotation
+    }
+
+
+type PathCommandType
+    = MoveCmd PathPoint
+    | LineCmd PathPoint
+    | CubicCurveCmd PathPoint PathPointPair
+    | SmoothCubicCurveCmd PathPoint PathPoint
+    | QuadraticCurveCmd PathPoint PathPoint
+    | SmoothQuadraticCurveCmd PathPoint
+    | ArcCmd PathPoint PathArcParameters
+    | CloseCmd
 
 
 type PathCommand
-    = Move PathPositioning PathPoint
-    | Line PathPositioning PathPoint
-    | HorizontalLine PathPositioning Float
-    | VerticalLine PathPositioning Float
-    | CubicCurve PathPositioning PathPoint PathPoint PathPoint
-    | SmoothCubicCurve PathPositioning PathPoint PathPoint
-    | QuadraticCurve PathPositioning PathPoint PathPoint
-    | SmoothQuadraticCurve PathPositioning PathPoint
-    | Arc PathPositioning Float Float Float PathArcSize PathArcRotation PathPoint
-    | Close
+    = PathCommand Bool PathCommandType
+
+
+type alias PathCommands =
+    List PathCommand
+
+
+type PathSegmentType
+    = Line
+    | CubicCurve PathPointPair
+    | QuadraticCurve PathPoint
+    | Arc
+        { radii : PathPoint
+        , angle : Float
+        , size : PathArcSize
+        , rotation : PathArcRotation
+        }
+
+
+type PathSegment
+    = PathSegment PathPointPair PathSegmentType
 
 
 type alias Path =
-    List PathCommand
+    List PathSegment
+
+
+type alias PathWithPoint =
+    { path : Path
+    , currentPoint : PathPoint
+    }
+
+
+origin : PathPoint
+origin =
+    { x = 0, y = 0 }
+
+
+pointOperate : (Float -> Float -> Float) -> PathPoint -> PathPoint -> PathPoint
+pointOperate op point1 point2 =
+    { x = op point1.x point2.x
+    , y = op point1.y point2.y
+    }
+
+
+pointAdd : PathPoint -> PathPoint -> PathPoint
+pointAdd =
+    pointOperate (+)
+
+
+pointSubtract : PathPoint -> PathPoint -> PathPoint
+pointSubtract =
+    pointOperate (-)
+
+
+
+-- TRANSFORMATIONS
 
 
 pointString : PathPoint -> String
@@ -65,254 +125,502 @@ pointString point =
 
 
 commandString : PathCommand -> String
-commandString command =
+commandString (PathCommand isRelative commandType) =
     let
-        commandLetter : PathPositioning -> String -> String
-        commandLetter positioning letter =
-            if positioning == Absolute then
-                letter
+        letterCase : String -> String
+        letterCase letter =
+            if isRelative then
+                String.toLower letter
 
             else
-                String.toLower letter
+                letter
+
+        arcSizeString : PathArcSize -> String
+        arcSizeString size =
+            case size of
+                Large ->
+                    "1"
+
+                Small ->
+                    "0"
+
+        arcRotationString : PathArcRotation -> String
+        arcRotationString rotation =
+            case rotation of
+                Clockwise ->
+                    "1"
+
+                CounterClockwise ->
+                    "0"
     in
     String.join " "
-        (case command of
-            Move positioning point ->
-                [ "M" |> commandLetter positioning
-                , pointString point
+        (case commandType of
+            MoveCmd endPoint ->
+                [ letterCase "M"
+                , pointString endPoint
                 ]
 
-            Line positioning point ->
-                [ "L" |> commandLetter positioning
-                , pointString point
+            LineCmd endPoint ->
+                if endPoint.x == 0 then
+                    [ letterCase "V"
+                    , String.fromFloat endPoint.y
+                    ]
+
+                else if endPoint.y == 0 then
+                    [ letterCase "H"
+                    , String.fromFloat endPoint.x
+                    ]
+
+                else
+                    [ letterCase "L"
+                    , pointString endPoint
+                    ]
+
+            CubicCurveCmd endPoint controls ->
+                [ letterCase "C"
+                , pointString controls.start
+                , pointString controls.end
+                , pointString endPoint
                 ]
 
-            HorizontalLine positioning dx ->
-                [ "H" |> commandLetter positioning
-                , String.fromFloat dx
-                ]
-
-            VerticalLine positioning dy ->
-                [ "V" |> commandLetter positioning
-                , String.fromFloat dy
-                ]
-
-            CubicCurve positioning control1 control2 point ->
-                [ "C" |> commandLetter positioning
-                , pointString control1
-                , pointString control2
-                , pointString point
-                ]
-
-            SmoothCubicCurve positioning control point ->
-                [ "S" |> commandLetter positioning
+            SmoothCubicCurveCmd endPoint control ->
+                [ letterCase "S"
                 , pointString control
-                , pointString point
+                , pointString endPoint
                 ]
 
-            QuadraticCurve positioning control point ->
-                [ "Q" |> commandLetter positioning
+            QuadraticCurveCmd endPoint control ->
+                [ letterCase "Q"
                 , pointString control
-                , pointString point
+                , pointString endPoint
                 ]
 
-            SmoothQuadraticCurve positioning point ->
-                [ "T" |> commandLetter positioning
-                , pointString point
+            SmoothQuadraticCurveCmd endPoint ->
+                [ letterCase "T"
+                , pointString endPoint
                 ]
 
-            Arc positioning rx ry angle arcSize arcRotation point ->
-                let
-                    arcSizeFlag =
-                        if arcSize == Large then
-                            "1"
-
-                        else
-                            "0"
-
-                    arcRotationFlag =
-                        if arcRotation == Clockwise then
-                            "1"
-
-                        else
-                            "0"
-                in
-                [ "A" |> commandLetter positioning
-                , String.fromFloat rx
-                , String.fromFloat ry
+            ArcCmd endPoint { radii, angle, size, rotation } ->
+                [ letterCase "A"
+                , String.fromFloat radii.x
+                , String.fromFloat radii.y
                 , String.fromFloat angle
-                , arcSizeFlag
-                , arcRotationFlag
-                , pointString point
+                , arcSizeString size
+                , arcRotationString rotation
+                , pointString endPoint
                 ]
 
-            Close ->
-                [ "Z" ]
+            CloseCmd ->
+                [ letterCase "Z" ]
         )
 
 
-pathString : Path -> String
-pathString p =
+commandFromSegment : PathPoint -> PathSegment -> PathCommands
+commandFromSegment currentPoint (PathSegment points segmentType) =
     let
-        appendCommand : PathCommand -> String -> String
-        appendCommand command string =
-            string ++ commandString command
+        isRelative : Bool
+        isRelative =
+            False
+
+        makeCommands : PathCommandType -> PathCommands
+        makeCommands commandType =
+            if points.start /= currentPoint then
+                [ PathCommand isRelative (MoveCmd points.start)
+                , PathCommand isRelative commandType
+                ]
+
+            else
+                [ PathCommand isRelative commandType ]
     in
-    List.foldl appendCommand "" p
+    case segmentType of
+        Line ->
+            makeCommands (LineCmd points.end)
+
+        CubicCurve controls ->
+            makeCommands (CubicCurveCmd points.end controls)
+
+        QuadraticCurve control ->
+            makeCommands (QuadraticCurveCmd points.end control)
+
+        Arc parameters ->
+            makeCommands (ArcCmd points.end parameters)
 
 
-pathFloat : Parser Float
+segmentFromCommand : PathCommand -> PathWithPoint -> PathWithPoint
+segmentFromCommand (PathCommand isRelative commandType) currentPathWithPoint =
+    let
+        currentPath : Path
+        currentPath =
+            currentPathWithPoint.path
+
+        targetPoints : PathPoint -> PathPointPair
+        targetPoints endPoint =
+            { start = currentPathWithPoint.currentPoint
+            , end =
+                if isRelative then
+                    pointAdd currentPathWithPoint.currentPoint endPoint
+
+                else
+                    endPoint
+            }
+
+        lastSegmentType : Maybe PathSegmentType
+        lastSegmentType =
+            Maybe.map (\(PathSegment _ lastType) -> lastType) (List.head currentPath)
+
+        previousControlPoint : Maybe PathPoint
+        previousControlPoint =
+            case ( commandType, lastSegmentType ) of
+                ( CubicCurveCmd _ _, Just (CubicCurve controls) ) ->
+                    Just controls.end
+
+                ( QuadraticCurveCmd _ _, Just (QuadraticCurve control) ) ->
+                    Just control
+
+                _ ->
+                    Nothing
+    in
+    case commandType of
+        MoveCmd endPoint ->
+            { currentPathWithPoint | currentPoint = (targetPoints endPoint).end }
+
+        LineCmd endPoint ->
+            { path = PathSegment (targetPoints endPoint) Line :: currentPath
+            , currentPoint = (targetPoints endPoint).end
+            }
+
+        CubicCurveCmd endPoint controls ->
+            let
+                targetControls : PathPointPair
+                targetControls =
+                    if isRelative then
+                        { start = pointAdd (targetPoints endPoint).start controls.start
+                        , end = pointAdd (targetPoints endPoint).start controls.end
+                        }
+
+                    else
+                        controls
+            in
+            { path = PathSegment (targetPoints endPoint) (CubicCurve targetControls) :: currentPath
+            , currentPoint = (targetPoints endPoint).end
+            }
+
+        SmoothCubicCurveCmd endPoint control ->
+            let
+                controlDiff : PathPoint
+                controlDiff =
+                    pointSubtract (targetPoints endPoint).start (targetPoints endPoint).end
+
+                controlStart : PathPoint
+                controlStart =
+                    case previousControlPoint of
+                        Just point ->
+                            pointAdd point controlDiff
+
+                        Nothing ->
+                            (targetPoints endPoint).start
+
+                targetControls : PathPointPair
+                targetControls =
+                    if isRelative then
+                        { start = controlStart
+                        , end = pointAdd (targetPoints endPoint).start control
+                        }
+
+                    else
+                        { start = controlStart
+                        , end = control
+                        }
+            in
+            { path = PathSegment (targetPoints endPoint) (CubicCurve targetControls) :: currentPath
+            , currentPoint = (targetPoints endPoint).end
+            }
+
+        QuadraticCurveCmd endPoint control ->
+            let
+                targetControl : PathPoint
+                targetControl =
+                    if isRelative then
+                        pointAdd (targetPoints endPoint).start control
+
+                    else
+                        control
+            in
+            { path = PathSegment (targetPoints endPoint) (QuadraticCurve targetControl) :: currentPath
+            , currentPoint = (targetPoints endPoint).end
+            }
+
+        SmoothQuadraticCurveCmd endPoint ->
+            let
+                controlDiff : PathPoint
+                controlDiff =
+                    pointSubtract (targetPoints endPoint).start (targetPoints endPoint).end
+
+                targetControl : PathPoint
+                targetControl =
+                    case previousControlPoint of
+                        Just point ->
+                            pointAdd point controlDiff
+
+                        Nothing ->
+                            (targetPoints endPoint).start
+            in
+            { path = PathSegment (targetPoints endPoint) (QuadraticCurve targetControl) :: currentPath
+            , currentPoint = (targetPoints endPoint).end
+            }
+
+        ArcCmd endPoint parameters ->
+            { path = PathSegment (targetPoints endPoint) (Arc parameters) :: currentPath
+            , currentPoint = (targetPoints endPoint).end
+            }
+
+        CloseCmd ->
+            let
+                firstSegmentHelper : Path -> Maybe PathSegment
+                firstSegmentHelper remainingPath =
+                    case remainingPath of
+                        segment :: [] ->
+                            Just segment
+
+                        _ :: rest ->
+                            firstSegmentHelper rest
+
+                        [] ->
+                            Nothing
+
+                firstSegment : Maybe PathSegment
+                firstSegment =
+                    firstSegmentHelper currentPath
+            in
+            case firstSegment of
+                Just (PathSegment points _) ->
+                    let
+                        closingLinePoints : PathPointPair
+                        closingLinePoints =
+                            { start = currentPathWithPoint.currentPoint, end = points.start }
+                    in
+                    { path = PathSegment closingLinePoints Line :: currentPath
+                    , currentPoint = points.start
+                    }
+
+                Nothing ->
+                    currentPathWithPoint
+
+
+pathFromCommands : PathCommands -> Path
+pathFromCommands commands =
+    List.foldl segmentFromCommand { path = [], currentPoint = origin } commands
+        |> .path
+        |> List.reverse
+
+
+
+-- PARSERS
+
+
+pathFloat : Parser.Parser Float
 pathFloat =
-    oneOf
-        [ succeed negate
+    Parser.oneOf
+        [ Parser.succeed negate
             |. Parser.symbol "-"
-            |= float
-        , float
+            |= Parser.float
+        , Parser.float
         ]
 
 
-pathPoint : Parser PathPoint
+pathPoint : Parser.Parser PathPoint
 pathPoint =
-    succeed PathPoint
+    Parser.succeed PathPoint
         |= pathFloat
-        |. oneOf [ Parser.symbol ",", spaces ]
+        |. Parser.oneOf [ Parser.symbol ",", Parser.spaces ]
         |= pathFloat
 
 
-pathCommand : Parser PathCommand
-pathCommand =
+pathPointPair : Parser.Parser PathPointPair
+pathPointPair =
+    Parser.succeed PathPointPair
+        |= pathPoint
+        |. Parser.spaces
+        |= pathPoint
+
+
+moveCommandType : Parser.Parser PathCommandType
+moveCommandType =
+    Parser.succeed MoveCmd
+        |. Parser.spaces
+        |= pathPoint
+        |. Parser.spaces
+
+
+lineCommandType : Parser.Parser PathCommandType
+lineCommandType =
+    Parser.succeed LineCmd
+        |. Parser.spaces
+        |= pathPoint
+        |. Parser.spaces
+
+
+horizontalLineCommandType : Parser.Parser PathCommandType
+horizontalLineCommandType =
+    Parser.succeed LineCmd
+        |. Parser.spaces
+        |= Parser.map (\dx -> { x = dx, y = 0 }) pathFloat
+        |. Parser.spaces
+
+
+verticalLineCommandType : Parser.Parser PathCommandType
+verticalLineCommandType =
+    Parser.succeed LineCmd
+        |. Parser.spaces
+        |= Parser.map (\dy -> { x = 0, y = dy }) pathFloat
+        |. Parser.spaces
+
+
+cubicCurveCommandType : Parser.Parser PathCommandType
+cubicCurveCommandType =
+    Parser.succeed CubicCurveCmd
+        |. Parser.spaces
+        |= pathPoint
+        |. Parser.spaces
+        |= pathPointPair
+        |. Parser.spaces
+
+
+smoothCubicCurveCommandType : Parser.Parser PathCommandType
+smoothCubicCurveCommandType =
+    Parser.succeed SmoothCubicCurveCmd
+        |. Parser.spaces
+        |= pathPoint
+        |. Parser.spaces
+        |= pathPoint
+        |. Parser.spaces
+
+
+quadraticCurveCommandType : Parser.Parser PathCommandType
+quadraticCurveCommandType =
+    Parser.succeed QuadraticCurveCmd
+        |. Parser.spaces
+        |= pathPoint
+        |. Parser.spaces
+        |= pathPoint
+        |. Parser.spaces
+
+
+smoothQuadraticCurveCommandType : Parser.Parser PathCommandType
+smoothQuadraticCurveCommandType =
+    Parser.succeed SmoothQuadraticCurveCmd
+        |. Parser.spaces
+        |= pathPoint
+        |. Parser.spaces
+
+
+arcCommandType : Parser.Parser PathCommandType
+arcCommandType =
     let
-        commandLetter : String -> String -> Parser PathPositioning
-        commandLetter absoluteLetter relativeLetter =
-            oneOf
-                [ Parser.map (\_ -> Absolute) (Parser.symbol absoluteLetter)
-                , Parser.map (\_ -> Relative) (Parser.symbol relativeLetter)
-                ]
-
-        arcSizeFlag : Parser PathArcSize
+        arcSizeFlag : Parser.Parser PathArcSize
         arcSizeFlag =
-            oneOf
+            Parser.oneOf
                 [ Parser.map (\_ -> Large) (Parser.symbol "1")
                 , Parser.map (\_ -> Small) (Parser.symbol "0")
                 ]
 
-        arcRotationFlag : Parser PathArcRotation
+        arcRotationFlag : Parser.Parser PathArcRotation
         arcRotationFlag =
-            oneOf
+            Parser.oneOf
                 [ Parser.map (\_ -> Clockwise) (Parser.symbol "1")
                 , Parser.map (\_ -> CounterClockwise) (Parser.symbol "0")
                 ]
+
+        arcParameters : Parser.Parser PathArcParameters
+        arcParameters =
+            Parser.succeed PathArcParameters
+                |= pathPoint
+                |. Parser.spaces
+                |= pathFloat
+                |. Parser.spaces
+                |= arcSizeFlag
+                |. Parser.spaces
+                |= arcRotationFlag
     in
-    oneOf
-        [ succeed Move
-            |= commandLetter "M" "m"
-            |. spaces
-            |= pathPoint
-            |. spaces
-        , succeed Line
-            |= commandLetter "L" "l"
-            |. spaces
-            |= pathPoint
-            |. spaces
-        , succeed HorizontalLine
-            |= commandLetter "H" "h"
-            |. spaces
-            |= pathFloat
-            |. spaces
-        , succeed VerticalLine
-            |= commandLetter "V" "v"
-            |. spaces
-            |= pathFloat
-            |. spaces
-        , succeed CubicCurve
-            |= commandLetter "C" "c"
-            |. spaces
-            |= pathPoint
-            |. spaces
-            |= pathPoint
-            |. spaces
-            |= pathPoint
-            |. spaces
-        , succeed SmoothCubicCurve
-            |= commandLetter "S" "s"
-            |. spaces
-            |= pathPoint
-            |. spaces
-            |= pathPoint
-            |. spaces
-        , succeed QuadraticCurve
-            |= commandLetter "Q" "q"
-            |. spaces
-            |= pathPoint
-            |. spaces
-            |= pathPoint
-            |. spaces
-        , succeed SmoothQuadraticCurve
-            |= commandLetter "T" "t"
-            |. spaces
-            |= pathPoint
-            |. spaces
-        , succeed Arc
-            |= commandLetter "A" "a"
-            |. spaces
-            |= pathFloat
-            |. spaces
-            |= pathFloat
-            |. spaces
-            |= pathFloat
-            |. spaces
-            |= arcSizeFlag
-            |. spaces
-            |= arcRotationFlag
-            |. spaces
-            |= pathPoint
-            |. spaces
-        , succeed Close
-            |. oneOf
-                [ Parser.symbol "Z"
-                , Parser.symbol "z"
-                ]
-            |. spaces
+    Parser.succeed ArcCmd
+        |. Parser.spaces
+        |= pathPoint
+        |. Parser.spaces
+        |= arcParameters
+        |. Parser.spaces
+
+
+closeCommandType : Parser.Parser PathCommandType
+closeCommandType =
+    Parser.succeed CloseCmd
+        |. Parser.spaces
+
+
+pathCommandType : String -> Parser.Parser PathCommandType -> Parser.Parser PathCommand
+pathCommandType commandLetter commandType =
+    Parser.succeed PathCommand
+        |= Parser.oneOf
+            [ Parser.map (\_ -> False) (Parser.symbol commandLetter)
+            , Parser.map (\_ -> True) (Parser.symbol (String.toLower commandLetter))
+            ]
+        |= commandType
+
+
+pathCommand : Parser.Parser PathCommand
+pathCommand =
+    Parser.oneOf
+        [ pathCommandType "M" moveCommandType
+        , pathCommandType "L" lineCommandType
+        , pathCommandType "H" horizontalLineCommandType
+        , pathCommandType "V" verticalLineCommandType
+        , pathCommandType "C" cubicCurveCommandType
+        , pathCommandType "S" smoothCubicCurveCommandType
+        , pathCommandType "Q" quadraticCurveCommandType
+        , pathCommandType "T" smoothQuadraticCurveCommandType
+        , pathCommandType "A" arcCommandType
+        , pathCommandType "Z" closeCommandType
         ]
 
 
-path : Parser Path
-path =
+pathCommands : Parser.Parser PathCommands
+pathCommands =
     let
-        pathHelp : Path -> Parser (Step Path Path)
+        pathHelp : PathCommands -> Parser.Parser (Parser.Step PathCommands PathCommands)
         pathHelp reversePath =
-            oneOf
-                [ succeed (\command -> Loop (command :: reversePath))
+            Parser.oneOf
+                [ Parser.succeed (\command -> Parser.Loop (command :: reversePath))
                     |= pathCommand
-                , succeed ()
-                    |> Parser.map (\_ -> Done (List.reverse reversePath))
+                , Parser.succeed ()
+                    |> Parser.map (\_ -> Parser.Done (List.reverse reversePath))
                 ]
     in
     Parser.loop [] pathHelp
 
 
-parsePath : String -> ( Path, String )
-parsePath string =
-    case run path string of
-        Ok p ->
-            ( p, "No Errors Found" )
+parsePathString : String -> ( PathCommands, String )
+parsePathString pathString =
+    case Parser.run pathCommands pathString of
+        Ok pcs ->
+            ( pcs, "No Errors Found" )
 
         Err _ ->
             ( [], "Errors!" )
 
 
 type alias Model =
-    { pathString : String
-    , path : Path
-    , errorString : String
+    { path : Path
+    , pathCommands : PathCommands
+    , pathCommandsString : String
+    , parseErrorString : String
     }
 
 
 init : Model
 init =
-    { pathString = ""
-    , path = []
-    , errorString = ""
+    { path = []
+    , pathCommands = []
+    , pathCommandsString = ""
+    , parseErrorString = ""
     }
 
 
@@ -327,15 +635,16 @@ type Msg
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        Change newPath ->
+        Change newPathString ->
             let
-                parseResult =
-                    parsePath newPath
+                ( parsedPathCommands, parsedErrorString ) =
+                    parsePathString newPathString
             in
             { model
-                | pathString = newPath
-                , path = Tuple.first parseResult
-                , errorString = Tuple.second parseResult
+                | path = pathFromCommands parsedPathCommands
+                , pathCommands = parsedPathCommands
+                , pathCommandsString = newPathString
+                , parseErrorString = parsedErrorString
             }
 
 
@@ -346,17 +655,17 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ input [ value model.pathString, onInput Change ] []
+        [ input [ value model.pathCommandsString, onInput Change ] []
         , svg
             [ Svg.Attributes.height "120"
             , Svg.Attributes.width "120"
             , viewBox "0 0 10 10"
             ]
-            [ Svg.path [ d model.pathString ] [] ]
-        , p [] [ Html.text model.errorString ]
+            [ Svg.path [ d model.pathCommandsString ] [] ]
+        , p [] [ Html.text model.parseErrorString ]
         , ul []
             (List.map
                 (\command -> li [] [ Html.text (commandString command) ])
-                model.path
+                model.pathCommands
             )
         ]
