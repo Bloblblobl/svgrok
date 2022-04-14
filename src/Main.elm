@@ -1,12 +1,12 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (onInput)
+import Html
+import Html.Attributes as HtmlA
+import Html.Events as HtmlE
 import Parser exposing ((|.), (|=))
-import Svg exposing (..)
-import Svg.Attributes exposing (..)
+import Svg
+import Svg.Attributes as SvgA
 
 
 
@@ -652,20 +652,20 @@ update msg model =
 -- VIEW
 
 
-view : Model -> Html Msg
+view : Model -> Html.Html Msg
 view model =
-    div []
-        [ input [ value model.pathCommandsString, onInput Change ] []
-        , svg
-            [ Svg.Attributes.height "120"
-            , Svg.Attributes.width "120"
-            , viewBox "0 0 10 10"
+    Html.div []
+        [ Html.input [ HtmlA.value model.pathCommandsString, HtmlE.onInput Change ] []
+        , Svg.svg
+            [ SvgA.height "120"
+            , SvgA.width "120"
+            , SvgA.viewBox "0 0 10 10"
             ]
-            [ Svg.path [ d model.pathCommandsString ] [] ]
-        , p [] [ Html.text model.parseErrorString ]
-        , ul []
+            [ Svg.path [ SvgA.d model.pathCommandsString ] [] ]
+        , Html.p [] [ Html.text model.parseErrorString ]
+        , Html.ul []
             (List.map
-                (\command -> li [] [ Html.text (commandString command) ])
+                (\command -> Html.li [] [ Html.text (commandString command) ])
                 model.pathCommands
             )
         ]
