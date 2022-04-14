@@ -702,20 +702,43 @@ parsePathString pathString =
             ( [], "Errors!" )
 
 
+
+-- MODEL
+
+
+type alias Config =
+    { fill : String
+    , stroke : String
+    , strokeWidth : String
+    , viewBox : String
+    }
+
+
 type alias Model =
-    { path : Path
+    { config : Config
+    , parseErrorString : String
+    , path : Path
     , pathCommands : PathCommands
     , pathCommandsString : String
-    , parseErrorString : String
+    }
+
+
+initConfig : Config
+initConfig =
+    { fill = "none"
+    , stroke = "black"
+    , strokeWidth = "1"
+    , viewBox = "0 0 100 100"
     }
 
 
 init : Model
 init =
-    { path = []
+    { config = initConfig
+    , parseErrorString = ""
+    , path = []
     , pathCommands = []
     , pathCommandsString = ""
-    , parseErrorString = ""
     }
 
 
@@ -754,10 +777,10 @@ view model =
         , Svg.svg
             [ SvgA.height "120"
             , SvgA.width "120"
-            , SvgA.viewBox "0 0 10 10"
-            , SvgA.stroke "black"
-            , SvgA.strokeWidth "0.1px"
-            , SvgA.fill "none"
+            , SvgA.viewBox model.config.viewBox
+            , SvgA.stroke model.config.stroke
+            , SvgA.strokeWidth model.config.strokeWidth
+            , SvgA.fill model.config.fill
             ]
             [ Svg.path [ SvgA.d model.pathCommandsString ] [] ]
         , Html.p [] [ Html.text model.parseErrorString ]
