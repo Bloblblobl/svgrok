@@ -22,6 +22,10 @@ main =
         }
 
 
+
+-- TYPES
+
+
 type alias PathPoint =
     { x : Float, y : Float }
 
@@ -93,6 +97,24 @@ type alias PathWithPoint =
     }
 
 
+
+-- STRING UTILS
+
+
+wrapParens : String -> String
+wrapParens string =
+    "(" ++ string ++ ")"
+
+
+wrapBraces : String -> String
+wrapBraces string =
+    "{" ++ string ++ "}"
+
+
+
+-- POINTS
+
+
 origin : PathPoint
 origin =
     { x = 0, y = 0 }
@@ -122,6 +144,17 @@ pointSubtract =
 pointString : PathPoint -> String
 pointString point =
     String.fromFloat point.x ++ "," ++ String.fromFloat point.y
+
+
+pointPairString : PathPointPair -> String
+pointPairString { start, end } =
+    String.join ""
+        [ "start: "
+        , wrapParens (pointString start)
+        , ", end: "
+        , wrapParens (pointString end)
+        ]
+        |> wrapBraces
 
 
 commandString : PathCommand -> String
@@ -213,6 +246,63 @@ commandString (PathCommand isRelative commandType) =
             CloseCmd ->
                 [ letterCase "Z" ]
         )
+
+
+segmentString : PathSegment -> String
+segmentString (PathSegment points segmentType) =
+    case segmentType of
+        Line ->
+            "Line at " ++ pointPairString points
+
+        CubicCurve controls ->
+            String.join " "
+                [ "Cubic Curve at"
+                , pointPairString points
+                , "with controls at"
+                , pointPairString controls
+                ]
+
+        QuadraticCurve control ->
+            String.join " "
+                [ "Quadratic Curve at"
+                , pointPairString points
+                , "with control at"
+                , wrapParens (pointString control)
+                ]
+
+        Arc parameters ->
+            let
+                arcSizeString : String
+                arcSizeString =
+                    case parameters.size of
+                        Large ->
+                            "Large"
+
+                        Small ->
+                            "Small"
+
+                arcRotationString : String
+                arcRotationString =
+                    case parameters.rotation of
+                        Clockwise ->
+                            "Clockwise"
+
+                        CounterClockwise ->
+                            "Counter-Clockwise"
+            in
+            String.join " "
+                [ "Arc at"
+                , pointPairString points
+                , "with x,y radii"
+                , pointString parameters.radii
+                , "and that is"
+                , arcSizeString
+                , "and"
+                , arcRotationString
+                , "rotated"
+                , String.fromFloat parameters.angle
+                , "degrees"
+                ]
 
 
 commandFromSegment : PathPoint -> PathSegment -> PathCommands
@@ -432,7 +522,12 @@ pathPoint : Parser.Parser PathPoint
 pathPoint =
     Parser.succeed PathPoint
         |= pathFloat
-        |. Parser.oneOf [ Parser.symbol ",", Parser.spaces ]
+        |. Parser.oneOf
+            [ Parser.spaces
+                |. Parser.symbol ","
+                |. Parser.spaces
+            , Parser.spaces
+            ]
         |= pathFloat
 
 
@@ -660,6 +755,9 @@ view model =
             [ SvgA.height "120"
             , SvgA.width "120"
             , SvgA.viewBox "0 0 10 10"
+            , SvgA.stroke "black"
+            , SvgA.strokeWidth "0.1px"
+            , SvgA.fill "none"
             ]
             [ Svg.path [ SvgA.d model.pathCommandsString ] [] ]
         , Html.p [] [ Html.text model.parseErrorString ]
@@ -667,5 +765,11 @@ view model =
             (List.map
                 (\command -> Html.li [] [ Html.text (commandString command) ])
                 model.pathCommands
+            )
+        , Html.hr [] []
+        , Html.ul []
+            (List.map
+                (\segment -> Html.li [] [ Html.text (segmentString segment) ])
+                model.path
             )
         ]
