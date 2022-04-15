@@ -522,12 +522,12 @@ pathPoint : Parser.Parser PathPoint
 pathPoint =
     Parser.succeed PathPoint
         |= pathFloat
+        |. Parser.spaces
         |. Parser.oneOf
-            [ Parser.spaces
-                |. Parser.symbol ","
-                |. Parser.spaces
-            , Parser.spaces
+            [ Parser.symbol ","
+            , Parser.succeed ()
             ]
+        |. Parser.spaces
         |= pathFloat
 
 
@@ -707,8 +707,8 @@ parsePathString pathString =
 
 
 type alias Config =
-    { fill : String
-    , stroke : String
+    { fillColor : String
+    , strokeColor : String
     , strokeWidth : String
     , viewBox : String
     }
@@ -725,8 +725,8 @@ type alias Model =
 
 initConfig : Config
 initConfig =
-    { fill = "none"
-    , stroke = "black"
+    { fillColor = "none"
+    , strokeColor = "black"
     , strokeWidth = "1"
     , viewBox = "0 0 100 100"
     }
@@ -746,14 +746,38 @@ init =
 -- UPDATE
 
 
+type ConfigChange
+    = FillColor String
+    | StrokeColor String
+    | StrokeWidth String
+    | ViewBox String
+
+
 type Msg
-    = Change String
+    = PathStringChanged String
+    | ConfigChanged ConfigChange
+
+
+updateConfig : ConfigChange -> Config -> Config
+updateConfig configChange config =
+    case configChange of
+        FillColor newValue ->
+            { config | fillColor = newValue }
+
+        StrokeColor newValue ->
+            { config | strokeColor = newValue }
+
+        StrokeWidth newValue ->
+            { config | strokeWidth = newValue }
+
+        ViewBox newValue ->
+            { config | viewBox = newValue }
 
 
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        Change newPathString ->
+        PathStringChanged newPathString ->
             let
                 ( parsedPathCommands, parsedErrorString ) =
                     parsePathString newPathString
@@ -765,22 +789,56 @@ update msg model =
                 , parseErrorString = parsedErrorString
             }
 
+        ConfigChanged configChange ->
+            { model | config = updateConfig configChange model.config }
+
 
 
 -- VIEW
 
 
+viewConfig : Config -> Html.Html Msg
+viewConfig config =
+    Html.div []
+        [ Html.input
+            [ HtmlA.value config.fillColor
+            , HtmlE.onInput (\s -> ConfigChanged (FillColor s))
+            ]
+            []
+        , Html.input
+            [ HtmlA.value config.strokeColor
+            , HtmlE.onInput (\s -> ConfigChanged (StrokeColor s))
+            ]
+            []
+        , Html.input
+            [ HtmlA.value config.strokeWidth
+            , HtmlE.onInput (\s -> ConfigChanged (StrokeWidth s))
+            ]
+            []
+        , Html.input
+            [ HtmlA.value config.viewBox
+            , HtmlE.onInput (\s -> ConfigChanged (ViewBox s))
+            ]
+            []
+        ]
+
+
 view : Model -> Html.Html Msg
 view model =
     Html.div []
-        [ Html.input [ HtmlA.value model.pathCommandsString, HtmlE.onInput Change ] []
+        [ Html.input
+            [ HtmlA.value model.pathCommandsString
+            , HtmlE.onInput PathStringChanged
+            ]
+            []
+        , viewConfig model.config
         , Svg.svg
             [ SvgA.height "120"
             , SvgA.width "120"
-            , SvgA.viewBox model.config.viewBox
-            , SvgA.stroke model.config.stroke
+            , SvgA.fill model.config.fillColor
+            , SvgA.stroke model.config.strokeColor
             , SvgA.strokeWidth model.config.strokeWidth
-            , SvgA.fill model.config.fill
+            , SvgA.viewBox model.config.viewBox
             ]
             [ Svg.path [ SvgA.d model.pathCommandsString ] [] ]
         , Html.p [] [ Html.text model.parseErrorString ]
