@@ -7,6 +7,7 @@ import Html.Events as HtmlE
 import Path
 import Svg
 import Svg.Attributes as SvgA
+import Svg.Events as SvgE
 
 
 
@@ -40,6 +41,7 @@ type alias Model =
     , path : Path.Path
     , pathCommands : Path.Commands
     , pathCommandsString : String
+    , mouseOverPath : Bool
     }
 
 
@@ -59,6 +61,7 @@ init =
     , path = []
     , pathCommands = []
     , pathCommandsString = ""
+    , mouseOverPath = False
     }
 
 
@@ -76,6 +79,8 @@ type ConfigChange
 type Msg
     = PathStringChanged String
     | ConfigChanged ConfigChange
+    | MouseOverPath
+    | MouseOutPath
 
 
 updateConfig : ConfigChange -> Config -> Config
@@ -111,6 +116,12 @@ update msg model =
 
         ConfigChanged configChange ->
             { model | config = updateConfig configChange model.config }
+
+        MouseOverPath ->
+            { model | mouseOverPath = True }
+
+        MouseOutPath ->
+            { model | mouseOverPath = False }
 
 
 
@@ -159,8 +170,15 @@ view model =
             , SvgA.stroke model.config.strokeColor
             , SvgA.strokeWidth model.config.strokeWidth
             , SvgA.viewBox model.config.viewBox
+            , SvgE.onMouseOver MouseOverPath
+            , SvgE.onMouseOut MouseOutPath
             ]
             [ Svg.path [ SvgA.d model.pathCommandsString ] [] ]
+        , if model.mouseOverPath then
+            Html.text "Mouse Over"
+
+          else
+            Html.text "Mouse Not Over"
         , Html.p [] [ Html.text model.parseErrorString ]
         , Html.ul []
             (List.map
