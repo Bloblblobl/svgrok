@@ -104,14 +104,14 @@ update msg model =
     case msg of
         PathStringChanged newPathString ->
             let
-                ( parsedPathCommands, parsedErrorString ) =
-                    Path.commandsFromString newPathString
+                ( path, commands, errorString ) =
+                    Path.fromString newPathString
             in
             { model
-                | path = Path.fromCommands parsedPathCommands
-                , pathCommands = parsedPathCommands
+                | path = path
+                , pathCommands = commands
                 , pathCommandsString = newPathString
-                , parseErrorString = parsedErrorString
+                , parseErrorString = errorString
             }
 
         ConfigChanged configChange ->
@@ -182,13 +182,19 @@ view model =
         , Html.p [] [ Html.text model.parseErrorString ]
         , Html.ul []
             (List.map
-                (\command -> Html.li [] [ Html.text (Path.commandToString command) ])
+                (\command ->
+                    Html.li []
+                        [ Html.text (Path.commandToString command) ]
+                )
                 model.pathCommands
             )
         , Html.hr [] []
         , Html.ul []
             (List.map
-                (\segment -> Html.li [] [ Html.text (Path.segmentToString segment) ])
+                (\segment ->
+                    Html.li []
+                        [ Html.text (Path.segmentToString segment) ]
+                )
                 model.path
             )
         ]
