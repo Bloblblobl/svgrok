@@ -163,17 +163,9 @@ view model =
             ]
             []
         , viewConfig model.config
-        , Svg.svg
-            [ SvgA.height "120"
-            , SvgA.width "120"
-            , SvgA.fill model.config.fillColor
-            , SvgA.stroke model.config.strokeColor
-            , SvgA.strokeWidth model.config.strokeWidth
-            , SvgA.viewBox model.config.viewBox
-            , SvgE.onMouseOver MouseOverPath
-            , SvgE.onMouseOut MouseOutPath
-            ]
-            [ Svg.path [ SvgA.d model.pathCommandsString ] [] ]
+        , viewSvg model
+
+        -- , viewOverlay model
         , if model.mouseOverPath then
             Html.text "Mouse Over"
 
@@ -198,3 +190,55 @@ view model =
                 model.path
             )
         ]
+
+
+viewSvg : Model -> Html.Html Msg
+viewSvg model =
+    Svg.svg
+        [ SvgA.height "120"
+        , SvgA.width "120"
+        , SvgA.fill model.config.fillColor
+        , SvgA.stroke model.config.strokeColor
+        , SvgA.strokeWidth model.config.strokeWidth
+        , SvgA.viewBox model.config.viewBox
+        , SvgE.onMouseOver MouseOverPath
+        , SvgE.onMouseOut MouseOutPath
+        ]
+        [ Svg.path [ SvgA.d model.pathCommandsString ] [] ]
+
+
+
+-- viewOverlay : Model -> Html.Html Msg
+-- viewOverlay model =
+--     Svg.svg
+--         [ SvgA.height "120"
+--         , SvgA.width "120"
+--         , SvgA.fill "none"
+--         , SvgA.stroke "red"
+--         , SvgA.strokeWidth model.config.strokeWidth
+--         , SvgA.viewBox model.config.viewBox
+--         ]
+--         (List.map viewOverlaySegment model.path)
+-- viewOverlaySegment : Path.Segment -> Html.Html Msg
+-- viewOverlaySegment (Path.Segment points segmentType) =
+--     case segmentType of
+--         Path.Line ->
+--             --Svg.line
+--             Svg.text <|
+--                 "Line: "
+--                     ++ Path.segmentToString (Path.Segment points segmentType)
+--         Path.CubicCurve _ ->
+--             -- Svg.path
+--             Svg.text <|
+--                 "CubicCurve: "
+--                     ++ Path.segmentToString (Path.Segment points segmentType)
+--         Path.QuadraticCurve _ ->
+--             --Svg.path
+--             Svg.text <|
+--                 "QuadraticCurve: "
+--                     ++ Path.segmentToString (Path.Segment points segmentType)
+--         Path.Arc _ ->
+--             -- Svg.path
+--             Svg.text <|
+--                 "Arc: "
+--                     ++ Path.segmentToString (Path.Segment points segmentType)
