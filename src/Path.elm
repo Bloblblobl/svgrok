@@ -184,6 +184,26 @@ pointPairToString { start, end } =
         |> wrapBraces
 
 
+arcSizeToString : ArcSize -> String
+arcSizeToString size =
+    case size of
+        Large ->
+            "1"
+
+        Small ->
+            "0"
+
+
+arcRotationToString : ArcRotation -> String
+arcRotationToString rotation =
+    case rotation of
+        Clockwise ->
+            "1"
+
+        CounterClockwise ->
+            "0"
+
+
 commandToString : Command -> String
 commandToString (Command isRelative cmdType) =
     let
@@ -194,24 +214,6 @@ commandToString (Command isRelative cmdType) =
 
             else
                 letter
-
-        arcSizeString : ArcSize -> String
-        arcSizeString size =
-            case size of
-                Large ->
-                    "1"
-
-                Small ->
-                    "0"
-
-        arcRotationString : ArcRotation -> String
-        arcRotationString rotation =
-            case rotation of
-                Clockwise ->
-                    "1"
-
-                CounterClockwise ->
-                    "0"
     in
     String.join " "
         (case cmdType of
@@ -264,8 +266,8 @@ commandToString (Command isRelative cmdType) =
                 , String.fromFloat radii.x
                 , String.fromFloat radii.y
                 , String.fromFloat angle
-                , arcSizeString size
-                , arcRotationString rotation
+                , arcSizeToString size
+                , arcRotationToString rotation
                 , pointToString endPoint
                 ]
 
@@ -328,6 +330,49 @@ segmentToString (Segment points segmentType) =
                 , "rotated"
                 , String.fromFloat parameters.angle
                 , "degrees"
+                ]
+
+
+segmentToPathString : Segment -> String
+segmentToPathString (Segment points segmentType) =
+    case segmentType of
+        Line ->
+            String.join " "
+                [ "M"
+                , pointToString points.start
+                , pointToString points.end
+                ]
+
+        CubicCurve controls ->
+            String.join " "
+                [ "M"
+                , pointToString points.start
+                , "C"
+                , pointToString controls.start
+                , pointToString controls.end
+                , pointToString points.end
+                ]
+
+        QuadraticCurve control ->
+            String.join " "
+                [ "M"
+                , pointToString points.start
+                , "Q"
+                , pointToString control
+                , pointToString points.end
+                ]
+
+        Arc params ->
+            String.join " "
+                [ "M"
+                , pointToString points.start
+                , "A"
+                , String.fromFloat params.radii.x
+                , String.fromFloat params.radii.y
+                , String.fromFloat params.angle
+                , arcSizeToString params.size
+                , arcRotationToString params.rotation
+                , pointToString points.end
                 ]
 
 

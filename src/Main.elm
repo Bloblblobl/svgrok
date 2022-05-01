@@ -27,10 +27,24 @@ main =
 -- MODEL
 
 
+type alias ColorConfig =
+    { fillColor : String
+    , strokeColor : String
+    }
+
+
+type alias OverlayConfig =
+    { fillColor : String
+    , strokeColor : String
+    , marker : ColorConfig
+    }
+
+
 type alias Config =
     { fillColor : String
     , strokeColor : String
     , strokeWidth : String
+    , overlay : OverlayConfig
     , viewBox : String
     }
 
@@ -45,11 +59,23 @@ type alias Model =
     }
 
 
+initOverlayConfig : OverlayConfig
+initOverlayConfig =
+    { fillColor = "none"
+    , strokeColor = "red"
+    , marker =
+        { fillColor = "red"
+        , strokeColor = "none"
+        }
+    }
+
+
 initConfig : Config
 initConfig =
     { fillColor = "none"
     , strokeColor = "black"
     , strokeWidth = "1"
+    , overlay = initOverlayConfig
     , viewBox = "0 0 100 100"
     }
 
@@ -128,27 +154,27 @@ update msg model =
 -- VIEW
 
 
-viewConfig : Config -> Html.Html Msg
-viewConfig config =
+viewConfigPath : Config -> Html.Html Msg
+viewConfigPath { fillColor, strokeColor, strokeWidth, viewBox } =
     Html.div []
         [ Html.input
-            [ HtmlA.value config.fillColor
-            , HtmlE.onInput (\s -> ConfigChanged (FillColor s))
+            [ HtmlA.value fillColor
+            , HtmlE.onInput (FillColor >> ConfigChanged)
             ]
             []
         , Html.input
-            [ HtmlA.value config.strokeColor
-            , HtmlE.onInput (\s -> ConfigChanged (StrokeColor s))
+            [ HtmlA.value strokeColor
+            , HtmlE.onInput (StrokeColor >> ConfigChanged)
             ]
             []
         , Html.input
-            [ HtmlA.value config.strokeWidth
-            , HtmlE.onInput (\s -> ConfigChanged (StrokeWidth s))
+            [ HtmlA.value strokeWidth
+            , HtmlE.onInput (StrokeWidth >> ConfigChanged)
             ]
             []
         , Html.input
-            [ HtmlA.value config.viewBox
-            , HtmlE.onInput (\s -> ConfigChanged (ViewBox s))
+            [ HtmlA.value viewBox
+            , HtmlE.onInput (ViewBox >> ConfigChanged)
             ]
             []
         ]
@@ -162,10 +188,9 @@ view model =
             , HtmlE.onInput PathStringChanged
             ]
             []
-        , viewConfig model.config
+        , viewConfigPath model.config
         , viewSvg model
-
-        -- , viewOverlay model
+        , viewOverlay model
         , if model.mouseOverPath then
             Html.text "Mouse Over"
 
@@ -193,52 +218,70 @@ view model =
 
 
 viewSvg : Model -> Html.Html Msg
-viewSvg model =
+viewSvg { config, pathCommandsString } =
     Svg.svg
         [ SvgA.height "120"
         , SvgA.width "120"
-        , SvgA.fill model.config.fillColor
-        , SvgA.stroke model.config.strokeColor
-        , SvgA.strokeWidth model.config.strokeWidth
-        , SvgA.viewBox model.config.viewBox
+        , SvgA.fill config.fillColor
+        , SvgA.stroke config.strokeColor
+        , SvgA.strokeWidth config.strokeWidth
+        , SvgA.viewBox config.viewBox
         , SvgE.onMouseOver MouseOverPath
         , SvgE.onMouseOut MouseOutPath
         ]
-        [ Svg.path [ SvgA.d model.pathCommandsString ] [] ]
+        [ Svg.path [ SvgA.d pathCommandsString ] [] ]
+
+
+viewOverlay : Model -> Html.Html Msg
+viewOverlay { path, config } =
+    Svg.svg
+        [ SvgA.height "120"
+        , SvgA.width "120"
+        , SvgA.fill config.overlay.fillColor
+        , SvgA.stroke config.overlay.strokeColor
+        , SvgA.strokeWidth config.strokeWidth
+        , SvgA.viewBox config.viewBox
+        ]
+        (List.concatMap (viewOverlaySegment config) path)
 
 
 
--- viewOverlay : Model -> Html.Html Msg
--- viewOverlay model =
---     Svg.svg
---         [ SvgA.height "120"
---         , SvgA.width "120"
---         , SvgA.fill "none"
---         , SvgA.stroke "red"
---         , SvgA.strokeWidth model.config.strokeWidth
---         , SvgA.viewBox model.config.viewBox
---         ]
---         (List.map viewOverlaySegment model.path)
--- viewOverlaySegment : Path.Segment -> Html.Html Msg
--- viewOverlaySegment (Path.Segment points segmentType) =
---     case segmentType of
---         Path.Line ->
---             --Svg.line
---             Svg.text <|
---                 "Line: "
---                     ++ Path.segmentToString (Path.Segment points segmentType)
---         Path.CubicCurve _ ->
---             -- Svg.path
---             Svg.text <|
---                 "CubicCurve: "
---                     ++ Path.segmentToString (Path.Segment points segmentType)
---         Path.QuadraticCurve _ ->
---             --Svg.path
---             Svg.text <|
---                 "QuadraticCurve: "
---                     ++ Path.segmentToString (Path.Segment points segmentType)
---         Path.Arc _ ->
---             -- Svg.path
---             Svg.text <|
---                 "Arc: "
---                     ++ Path.segmentToString (Path.Segment points segmentType)
+-- TODO: use marker-start/marker-end attributes
+
+
+viewMarker : Config -> Path.Point -> Html.Html Msg
+viewMarker config point =
+    Svg.circle
+        [ SvgA.fill config.overlay.marker.fillColor
+        , SvgA.stroke config.overlay.marker.strokeColor
+        , SvgA.cx (String.fromFloat point.x)
+        , SvgA.cy (String.fromFloat point.y)
+        , SvgA.r config.strokeWidth
+        ]
+        []
+
+
+viewOverlaySegment : Config -> Path.Segment -> List (Html.Html Msg)
+viewOverlaySegment config (Path.Segment points segmentType) =
+    case segmentType of
+        Path.Line ->
+            [ viewMarker config points.start
+            , Svg.line
+                [ SvgA.x1 (String.fromFloat points.start.x)
+                , SvgA.y1 (String.fromFloat points.start.y)
+                , SvgA.x2 (String.fromFloat points.end.x)
+                , SvgA.y2 (String.fromFloat points.end.y)
+                ]
+                []
+            , viewMarker config points.end
+            ]
+
+        _ ->
+            [ viewMarker config points.start
+            , Svg.path
+                [ SvgA.d <|
+                    Path.segmentToPathString (Path.Segment points segmentType)
+                ]
+                []
+            , viewMarker config points.end
+            ]
