@@ -1081,3 +1081,34 @@ fromString string =
 
         Err _ ->
             ( [], [], "Errors!" )
+
+
+
+-- TODO: move this somewhere else
+
+
+type alias Rect =
+    { x : Float, y : Float, width : Float, height : Float }
+
+
+parseViewBoxString : P.Parser Rect
+parseViewBoxString =
+    P.succeed Rect
+        |. P.spaces
+        |= float
+        |. P.spaces
+        |= float
+        |. P.spaces
+        |= float
+        |. P.spaces
+        |= float
+
+
+viewBoxRectFromString : String -> Rect
+viewBoxRectFromString string =
+    case P.run parseViewBoxString string of
+        Ok rect ->
+            rect
+
+        Err _ ->
+            { x = 0, y = 0, width = 0, height = 0 }

@@ -1,9 +1,11 @@
 module Main exposing (..)
 
 import Browser
+import Browser.Events as BrowserE
 import Html
 import Html.Attributes as HtmlA
 import Html.Events as HtmlE
+import Json.Decode as JsonD
 import Path
 import Svg
 import Svg.Attributes as SvgA
@@ -16,9 +18,10 @@ import Svg.Events as SvgE
 
 main : Program () Model Msg
 main =
-    Browser.sandbox
+    Browser.element
         { init = init
         , update = update
+        , subscriptions = subscriptions
         , view = view
         }
 
@@ -46,6 +49,8 @@ type alias Config =
     , strokeWidth : String
     , overlay : OverlayConfig
     , viewBox : String
+    , editorHeight : String
+    , editorWidth : String
     }
 
 
@@ -55,7 +60,8 @@ type alias Model =
     , path : Path.Path
     , pathCommands : Path.Commands
     , pathCommandsString : String
-    , mouseOverPath : Bool
+    , mouseOverOverlay : Bool
+    , mouseOffset : Path.Point
     }
 
 
@@ -77,18 +83,23 @@ initConfig =
     , strokeWidth = "1"
     , overlay = initOverlayConfig
     , viewBox = "0 0 100 100"
+    , editorHeight = "400"
+    , editorWidth = "400"
     }
 
 
-init : Model
-init =
-    { config = initConfig
-    , parseErrorString = ""
-    , path = []
-    , pathCommands = []
-    , pathCommandsString = ""
-    , mouseOverPath = False
-    }
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { config = initConfig
+      , parseErrorString = ""
+      , path = []
+      , pathCommands = []
+      , pathCommandsString = ""
+      , mouseOverOverlay = False
+      , mouseOffset = { x = 0, y = 0 }
+      }
+    , Cmd.none
+    )
 
 
 
@@ -105,8 +116,9 @@ type ConfigChange
 type Msg
     = PathStringChanged String
     | ConfigChanged ConfigChange
-    | MouseOverPath
-    | MouseOutPath
+    | MouseOverOverlay
+    | MouseOutOverlay
+    | MouseMoveOverlay Path.Point
 
 
 updateConfig : ConfigChange -> Config -> Config
@@ -125,7 +137,7 @@ updateConfig configChange config =
             { config | viewBox = newValue }
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         PathStringChanged newPathString ->
@@ -133,25 +145,87 @@ update msg model =
                 ( path, commands, errorString ) =
                     Path.fromString newPathString
             in
-            { model
+            ( { model
                 | path = path
                 , pathCommands = commands
                 , pathCommandsString = newPathString
                 , parseErrorString = errorString
-            }
+              }
+            , Cmd.none
+            )
 
         ConfigChanged configChange ->
-            { model | config = updateConfig configChange model.config }
+            ( { model | config = updateConfig configChange model.config }
+            , Cmd.none
+            )
 
-        MouseOverPath ->
-            { model | mouseOverPath = True }
+        MouseOverOverlay ->
+            ( { model | mouseOverOverlay = True }
+            , Cmd.none
+            )
 
-        MouseOutPath ->
-            { model | mouseOverPath = False }
+        MouseOutOverlay ->
+            ( { model | mouseOverOverlay = False }
+            , Cmd.none
+            )
+
+        MouseMoveOverlay offset ->
+            ( { model | mouseOffset = offset }
+            , Cmd.none
+            )
+
+
+
+-- SUBSCRIPTIONS
+
+
+decodeMouseOffset : JsonD.Decoder Path.Point
+decodeMouseOffset =
+    JsonD.map2 Path.Point
+        (JsonD.field "offsetX" JsonD.float)
+        (JsonD.field "offsetY" JsonD.float)
+
+
+subscriptions : Model -> Sub Msg
+subscriptions { mouseOverOverlay } =
+    if mouseOverOverlay then
+        BrowserE.onMouseMove (JsonD.map MouseMoveOverlay decodeMouseOffset)
+
+    else
+        Sub.none
 
 
 
 -- VIEW
+
+
+preserveAspectRatio : Svg.Attribute msg
+preserveAspectRatio =
+    -- See preserveAspectRatio on MDN
+    SvgA.preserveAspectRatio "xMinYMin slice"
+
+
+elementToViewBoxPoint : Config -> Path.Point -> Path.Point
+elementToViewBoxPoint config point =
+    -- See https://www.w3.org/TR/SVG2/coords.html#ComputingAViewportsTransform
+    let
+        editorHeight : Float
+        editorHeight =
+            Maybe.withDefault 0 (String.toFloat config.editorHeight)
+
+        editorWidth : Float
+        editorWidth =
+            Maybe.withDefault 0 (String.toFloat config.editorWidth)
+
+        viewBox : Path.Rect
+        viewBox =
+            Path.viewBoxRectFromString config.viewBox
+
+        scale : Float
+        scale =
+            max (viewBox.height / editorHeight) (viewBox.width / editorWidth)
+    in
+    { x = (point.x * scale) + viewBox.x, y = (point.y * scale) + viewBox.y }
 
 
 viewConfigPath : Config -> Html.Html Msg
@@ -191,11 +265,7 @@ view model =
         , viewConfigPath model.config
         , viewSvg model
         , viewOverlay model
-        , if model.mouseOverPath then
-            Html.text "Mouse Over"
-
-          else
-            Html.text "Mouse Not Over"
+        , viewMouseOffset model
         , Html.p [] [ Html.text model.parseErrorString ]
         , Html.ul []
             (List.map
@@ -217,17 +287,32 @@ view model =
         ]
 
 
+viewMouseOffset : Model -> Html.Html Msg
+viewMouseOffset { config, mouseOffset } =
+    let
+        transformedOffset : Path.Point
+        transformedOffset =
+            elementToViewBoxPoint config mouseOffset
+    in
+    Html.text <|
+        String.join ""
+            [ "Mouse Offset: "
+            , String.fromFloat transformedOffset.x
+            , ","
+            , String.fromFloat transformedOffset.y
+            ]
+
+
 viewSvg : Model -> Html.Html Msg
 viewSvg { config, pathCommandsString } =
     Svg.svg
-        [ SvgA.height "120"
-        , SvgA.width "120"
+        [ SvgA.height config.editorHeight
+        , SvgA.width config.editorWidth
         , SvgA.fill config.fillColor
         , SvgA.stroke config.strokeColor
         , SvgA.strokeWidth config.strokeWidth
         , SvgA.viewBox config.viewBox
-        , SvgE.onMouseOver MouseOverPath
-        , SvgE.onMouseOut MouseOutPath
+        , preserveAspectRatio
         ]
         [ Svg.path [ SvgA.d pathCommandsString ] [] ]
 
@@ -235,22 +320,22 @@ viewSvg { config, pathCommandsString } =
 viewOverlay : Model -> Html.Html Msg
 viewOverlay { path, config } =
     Svg.svg
-        [ SvgA.height "120"
-        , SvgA.width "120"
+        [ SvgA.height config.editorHeight
+        , SvgA.width config.editorWidth
         , SvgA.fill config.overlay.fillColor
         , SvgA.stroke config.overlay.strokeColor
         , SvgA.strokeWidth config.strokeWidth
         , SvgA.viewBox config.viewBox
+        , SvgE.onMouseOver MouseOverOverlay
+        , SvgE.onMouseOut MouseOutOverlay
+        , preserveAspectRatio
         ]
         (List.concatMap (viewOverlaySegment config) path)
 
 
-
--- TODO: use marker-start/marker-end attributes
-
-
 viewMarker : Config -> Path.Point -> Html.Html Msg
 viewMarker config point =
+    -- TODO: use marker-start/marker-end attributes on the overlay segments
     Svg.circle
         [ SvgA.fill config.overlay.marker.fillColor
         , SvgA.stroke config.overlay.marker.strokeColor
