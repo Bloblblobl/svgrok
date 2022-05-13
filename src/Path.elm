@@ -15,6 +15,10 @@ type alias PointPair =
     { start : Point, end : Point }
 
 
+type alias Index2 =
+    ( Int, Int )
+
+
 type ArcSize
     = Large
     | Small
@@ -50,28 +54,12 @@ type Command
     = Command Bool CommandType
 
 
-type alias Commands =
-    List Command
-
-
-type SegmentType
-    = Line
-    | CubicCurve PointPair
-    | QuadraticCurve Point
-    | Arc
-        { radii : Point
-        , angle : Float
-        , size : ArcSize
-        , rotation : ArcRotation
-        }
-
-
-type Segment
-    = Segment PointPair SegmentType
-
-
-type alias Path =
-    List Segment
+type AbsoluteCommand
+    = AbsoluteMove Point
+    | AbsoluteLine Point
+    | AbsoluteCubicCurve PointPair Point
+    | AbsoluteQuadraticCurve Point Point
+    | AbsoluteArc ArcParameters Point
 
 
 type ParsingCommandType
@@ -93,8 +81,7 @@ type ParseState
 
 
 type alias ParseInfo =
-    { path : Path
-    , commands : Commands
+    { commands : List Command
     , state : ParseState
     , currentPoint : Point
     , firstConnectedPoint : Maybe Point
@@ -103,15 +90,6 @@ type alias ParseInfo =
 
 type alias InfoParser =
     P.Parser ParseInfo
-
-
-type alias CommandToSegmentInfo =
-    { command : Command
-    , currentPoint : Point
-    , firstConnectedPoint : Maybe Point
-    , lastCommandType : Maybe CommandType
-    , lastSegmentType : Maybe SegmentType
-    }
 
 
 
@@ -142,6 +120,13 @@ originPair =
     { start = origin, end = origin }
 
 
+pointScale : Float -> Point -> Point
+pointScale scale { x, y } =
+    { x = scale * x
+    , y = scale * y
+    }
+
+
 pointOperate : (Float -> Float -> Float) -> Point -> Point -> Point
 pointOperate op point1 point2 =
     { x = op point1.x point2.x
@@ -164,6 +149,15 @@ pointPairToVector pair =
     pointSubtract pair.end pair.start
 
 
+absolutePoint : Point -> Bool -> Point -> Point
+absolutePoint currentPoint isRelative p =
+    if isRelative then
+        pointAdd currentPoint p
+
+    else
+        p
+
+
 
 -- TO STRING FUNCTIONS
 
@@ -175,7 +169,7 @@ pointToString p =
 
 pointPairToString : PointPair -> String
 pointPairToString { start, end } =
-    String.join ""
+    String.concat
         [ "start: "
         , wrapParens (pointToString start)
         , ", end: "
@@ -276,327 +270,53 @@ commandToString (Command isRelative cmdType) =
         )
 
 
-segmentToString : Segment -> String
-segmentToString (Segment points segmentType) =
-    case segmentType of
-        Line ->
-            "Line at " ++ pointPairToString points
+commandsToString : List Command -> String
+commandsToString commands =
+    String.join " " (List.map commandToString commands)
 
-        CubicCurve controls ->
+
+absoluteCommandToString : AbsoluteCommand -> String
+absoluteCommandToString absoluteCommand =
+    case absoluteCommand of
+        AbsoluteMove endPoint ->
+            "M " ++ pointToString endPoint
+
+        AbsoluteLine endPoint ->
+            "L " ++ pointToString endPoint
+
+        AbsoluteCubicCurve controls endPoint ->
             String.join " "
-                [ "Cubic Curve at"
-                , pointPairToString points
-                , "with controls at"
-                , pointPairToString controls
-                ]
-
-        QuadraticCurve control ->
-            String.join " "
-                [ "Quadratic Curve at"
-                , pointPairToString points
-                , "with control at"
-                , wrapParens (pointToString control)
-                ]
-
-        Arc parameters ->
-            let
-                arcSizeString : String
-                arcSizeString =
-                    case parameters.size of
-                        Large ->
-                            "Large"
-
-                        Small ->
-                            "Small"
-
-                arcRotationString : String
-                arcRotationString =
-                    case parameters.rotation of
-                        Clockwise ->
-                            "Clockwise"
-
-                        CounterClockwise ->
-                            "Counter-Clockwise"
-            in
-            String.join " "
-                [ "Arc at"
-                , pointPairToString points
-                , "with x,y radii"
-                , pointToString parameters.radii
-                , "and that is"
-                , arcSizeString
-                , "and"
-                , arcRotationString
-                , "rotated"
-                , String.fromFloat parameters.angle
-                , "degrees"
-                ]
-
-
-segmentToPathString : Segment -> String
-segmentToPathString (Segment points segmentType) =
-    case segmentType of
-        Line ->
-            String.join " "
-                [ "M"
-                , pointToString points.start
-                , pointToString points.end
-                ]
-
-        CubicCurve controls ->
-            String.join " "
-                [ "M"
-                , pointToString points.start
-                , "C"
+                [ "C"
                 , pointToString controls.start
                 , pointToString controls.end
-                , pointToString points.end
+                , pointToString endPoint
                 ]
 
-        QuadraticCurve control ->
+        AbsoluteQuadraticCurve control endPoint ->
             String.join " "
-                [ "M"
-                , pointToString points.start
-                , "Q"
+                [ "Q"
                 , pointToString control
-                , pointToString points.end
+                , pointToString endPoint
                 ]
 
-        Arc params ->
+        AbsoluteArc params endPoint ->
             String.join " "
-                [ "M"
-                , pointToString points.start
-                , "A"
+                [ "A"
                 , String.fromFloat params.radii.x
                 , String.fromFloat params.radii.y
                 , String.fromFloat params.angle
                 , arcSizeToString params.size
                 , arcRotationToString params.rotation
-                , pointToString points.end
+                , pointToString endPoint
                 ]
 
 
-
--- CONVERSION FUNCTIONS
-
-
-{-| TODO: optimize commands, e.g. smooth commands for curves, special case lines
--}
-commandFromSegment : Point -> Segment -> Commands
-commandFromSegment currentPoint (Segment points segmentType) =
-    let
-        isRelative : Bool
-        isRelative =
-            False
-
-        makeCommands : CommandType -> Commands
-        makeCommands cmdType =
-            if points.start /= currentPoint then
-                [ Command isRelative (MoveCommand points.start)
-                , Command isRelative cmdType
-                ]
-
-            else
-                [ Command isRelative cmdType ]
-    in
-    case segmentType of
-        Line ->
-            makeCommands (LineCommand points.end)
-
-        CubicCurve controls ->
-            makeCommands (CubicCurveCommand controls points.end)
-
-        QuadraticCurve control ->
-            makeCommands (QuadraticCurveCommand control points.end)
-
-        Arc parameters ->
-            makeCommands (ArcCommand parameters points.end)
-
-
-segmentFromCommand : CommandToSegmentInfo -> Maybe Segment
-segmentFromCommand info =
-    let
-        ( isRelative, cmdType ) =
-            (\(Command ir ct) -> ( ir, ct )) info.command
-
-        currentPoint : Point
-        currentPoint =
-            info.currentPoint
-
-        targetPoints : Point -> PointPair
-        targetPoints endPoint =
-            if isRelative then
-                { start = info.currentPoint
-                , end = pointAdd info.currentPoint endPoint
-                }
-
-            else
-                { start = info.currentPoint
-                , end = endPoint
-                }
-    in
-    case cmdType of
-        MoveCommand _ ->
-            Nothing
-
-        LineCommand endPoint ->
-            Just <| Segment (targetPoints endPoint) Line
-
-        HorizontalLineCommand x ->
-            let
-                points : PointPair
-                points =
-                    if isRelative then
-                        { start = currentPoint
-                        , end = pointAdd currentPoint { x = x, y = 0 }
-                        }
-
-                    else
-                        { start = currentPoint
-                        , end = { currentPoint | x = x }
-                        }
-            in
-            Just <| Segment points Line
-
-        VerticalLineCommand y ->
-            let
-                points : PointPair
-                points =
-                    if isRelative then
-                        { start = currentPoint
-                        , end = pointAdd currentPoint { x = 0, y = y }
-                        }
-
-                    else
-                        { start = currentPoint
-                        , end = { currentPoint | y = y }
-                        }
-            in
-            Just <| Segment points Line
-
-        CubicCurveCommand controls endPoint ->
-            let
-                targetControls : PointPair
-                targetControls =
-                    if isRelative then
-                        { start = pointAdd info.currentPoint controls.start
-                        , end = pointAdd info.currentPoint controls.end
-                        }
-
-                    else
-                        controls
-            in
-            Just <| Segment (targetPoints endPoint) (CubicCurve targetControls)
-
-        SmoothCubicCurveCommand control endPoint ->
-            let
-                endControl : Point
-                endControl =
-                    if isRelative then
-                        pointAdd info.currentPoint control
-
-                    else
-                        control
-
-                defaultControls : PointPair
-                defaultControls =
-                    { start = info.currentPoint
-                    , end = endControl
-                    }
-
-                followingCubicCurve : Bool
-                followingCubicCurve =
-                    case info.lastCommandType of
-                        Just (CubicCurveCommand _ _) ->
-                            True
-
-                        Just (SmoothCubicCurveCommand _ _) ->
-                            True
-
-                        _ ->
-                            False
-
-                targetControls : PointPair
-                targetControls =
-                    if followingCubicCurve then
-                        case info.lastSegmentType of
-                            Just (CubicCurve previousControls) ->
-                                { start =
-                                    pointSubtract
-                                        previousControls.end
-                                        (pointPairToVector <|
-                                            targetPoints endPoint
-                                        )
-                                , end = endControl
-                                }
-
-                            _ ->
-                                defaultControls
-
-                    else
-                        defaultControls
-            in
-            Just <|
-                Segment (targetPoints endPoint) (CubicCurve targetControls)
-
-        QuadraticCurveCommand control endPoint ->
-            let
-                targetControl : Point
-                targetControl =
-                    if isRelative then
-                        pointAdd info.currentPoint control
-
-                    else
-                        control
-            in
-            Just <|
-                Segment (targetPoints endPoint) (QuadraticCurve targetControl)
-
-        SmoothQuadraticCurveCommand endPoint ->
-            let
-                followingQuadraticCurve : Bool
-                followingQuadraticCurve =
-                    case info.lastCommandType of
-                        Just (QuadraticCurveCommand _ _) ->
-                            True
-
-                        Just (SmoothQuadraticCurveCommand _) ->
-                            True
-
-                        _ ->
-                            False
-
-                targetControl : Point
-                targetControl =
-                    if followingQuadraticCurve then
-                        case info.lastSegmentType of
-                            Just (QuadraticCurve previousControl) ->
-                                pointSubtract
-                                    previousControl
-                                    (pointPairToVector <| targetPoints endPoint)
-
-                            _ ->
-                                info.currentPoint
-
-                    else
-                        info.currentPoint
-            in
-            Just <|
-                Segment (targetPoints endPoint) (QuadraticCurve targetControl)
-
-        ArcCommand parameters endPoint ->
-            Just <| Segment (targetPoints endPoint) (Arc parameters)
-
-        CloseCommand ->
-            Maybe.map
-                (\endPoint ->
-                    Segment
-                        { start = info.currentPoint
-                        , end = endPoint
-                        }
-                        Line
-                )
-                info.firstConnectedPoint
+absoluteCommandOverlayString : Point -> AbsoluteCommand -> String
+absoluteCommandOverlayString currentPoint absoluteCommand =
+    String.join " "
+        [ absoluteCommandToString (AbsoluteMove currentPoint)
+        , absoluteCommandToString absoluteCommand
+        ]
 
 
 
@@ -605,8 +325,7 @@ segmentFromCommand info =
 
 initParseInfo : ParseInfo
 initParseInfo =
-    { path = []
-    , commands = []
+    { commands = []
     , state = NotStarted
     , currentPoint = origin
     , firstConnectedPoint = Nothing
@@ -644,81 +363,51 @@ pointPair =
         |= point
 
 
-updateInfoFromLetter : ParseInfo -> String -> ParseInfo
-updateInfoFromLetter info letter =
+commandLetterToParsingType : List ( String, ParsingCommandType )
+commandLetterToParsingType =
+    [ ( "M", ParsingMove False )
+    , ( "L", ParsingLine False )
+    , ( "H", ParsingHorizontalLine False )
+    , ( "V", ParsingVerticalLine False )
+    , ( "C", ParsingCubicCurve False )
+    , ( "S", ParsingSmoothCubicCurve False )
+    , ( "Q", ParsingQuadraticCurve False )
+    , ( "T", ParsingSmoothQuadraticCurve False )
+    , ( "A", ParsingArc False )
+    , ( "Z", ParsingClose )
+    ]
+
+
+commandLetter : ParseInfo -> ( String, ParsingCommandType ) -> InfoParser
+commandLetter info ( letter, parseType ) =
     let
-        isRelative : Bool
-        isRelative =
-            String.toUpper letter /= letter
-
-        newInfoFromParsingCommandType : ParsingCommandType -> ParseInfo
-        newInfoFromParsingCommandType parsingCommandType =
-            { info | state = ParsingCommand isRelative parsingCommandType }
+        commandCase : String -> Bool -> InfoParser
+        commandCase letterCase isRelative =
+            P.succeed ()
+                |. P.token letterCase
+                |> P.map
+                    (\_ ->
+                        { info | state = ParsingCommand isRelative parseType }
+                    )
     in
-    case String.toUpper letter of
-        "M" ->
-            newInfoFromParsingCommandType (ParsingMove False)
-
-        "L" ->
-            newInfoFromParsingCommandType (ParsingLine False)
-
-        "H" ->
-            newInfoFromParsingCommandType (ParsingHorizontalLine False)
-
-        "V" ->
-            newInfoFromParsingCommandType (ParsingVerticalLine False)
-
-        "C" ->
-            newInfoFromParsingCommandType (ParsingCubicCurve False)
-
-        "S" ->
-            newInfoFromParsingCommandType (ParsingSmoothCubicCurve False)
-
-        "Q" ->
-            newInfoFromParsingCommandType (ParsingQuadraticCurve False)
-
-        "T" ->
-            newInfoFromParsingCommandType (ParsingSmoothQuadraticCurve False)
-
-        "A" ->
-            newInfoFromParsingCommandType (ParsingArc False)
-
-        "Z" ->
-            updateInfoWithCommand
-                (newInfoFromParsingCommandType ParsingClose)
-                isRelative
-                CloseCommand
-
-        -- Should not get to this case because only the letters above are valid
-        -- TODO: Make this impossible?
-        _ ->
-            info
+    P.oneOf
+        [ commandCase letter False
+        , commandCase (String.toLower letter) True
+        ]
 
 
-commandLetters : ParseInfo -> String -> InfoParser
-commandLetters info validLetters =
-    let
-        helper : Char -> List (P.Parser String) -> List (P.Parser String)
-        helper letter letterParsers =
-            List.concat
-                [ letterParsers
-                , P.succeed ()
-                    |. P.token (String.fromChar letter)
-                    |> P.getChompedString
-                    |> List.singleton
-                , P.succeed ()
-                    |. P.token (String.fromChar <| Char.toLower letter)
-                    |> P.getChompedString
-                    |> List.singleton
-                ]
-    in
-    String.foldl helper [] validLetters
-        |> List.map (P.map <| updateInfoFromLetter info)
-        |> P.oneOf
+moveCommandLetter : ParseInfo -> InfoParser
+moveCommandLetter info =
+    commandLetter info ( "M", ParsingMove False )
+
+
+allCommandLetters : ParseInfo -> InfoParser
+allCommandLetters info =
+    P.oneOf <| List.map (commandLetter info) commandLetterToParsingType
 
 
 updateInfoWithCommand : ParseInfo -> Bool -> CommandType -> ParseInfo
-updateInfoWithCommand info isRelative cmdType =
+updateInfoWithCommand info isRelative commandType =
     let
         currentPoint : Point
         currentPoint =
@@ -726,32 +415,40 @@ updateInfoWithCommand info isRelative cmdType =
 
         newCommand : Command
         newCommand =
-            Command isRelative cmdType
+            Command isRelative commandType
 
-        newSegment : Maybe Segment
-        newSegment =
-            segmentFromCommand
-                { command = newCommand
-                , currentPoint = currentPoint
-                , firstConnectedPoint = info.firstConnectedPoint
-                , lastCommandType =
-                    Maybe.map
-                        (\(Command _ ct) -> ct)
-                        (List.head info.commands)
-                , lastSegmentType =
-                    Maybe.map
-                        (\(Segment _ st) -> st)
-                        (List.head info.path)
-                }
+        newState : ParseState
+        newState =
+            case commandType of
+                MoveCommand _ ->
+                    ParsingCommand isRelative (ParsingMove True)
 
-        newPath : Path
-        newPath =
-            case newSegment of
-                Just ns ->
-                    ns :: info.path
+                LineCommand _ ->
+                    ParsingCommand isRelative (ParsingLine True)
 
-                Nothing ->
-                    info.path
+                HorizontalLineCommand _ ->
+                    ParsingCommand isRelative (ParsingHorizontalLine True)
+
+                VerticalLineCommand _ ->
+                    ParsingCommand isRelative (ParsingVerticalLine True)
+
+                CubicCurveCommand _ _ ->
+                    ParsingCommand isRelative (ParsingCubicCurve True)
+
+                SmoothCubicCurveCommand _ _ ->
+                    ParsingCommand isRelative (ParsingSmoothCubicCurve True)
+
+                QuadraticCurveCommand _ _ ->
+                    ParsingCommand isRelative (ParsingQuadraticCurve True)
+
+                SmoothQuadraticCurveCommand _ ->
+                    ParsingCommand isRelative (ParsingSmoothQuadraticCurve True)
+
+                ArcCommand _ _ ->
+                    ParsingCommand isRelative (ParsingArc True)
+
+                CloseCommand ->
+                    ParsingCommand isRelative ParsingClose
 
         newCurrentPointFromEndPoint : Point -> Point
         newCurrentPointFromEndPoint endPoint =
@@ -763,7 +460,7 @@ updateInfoWithCommand info isRelative cmdType =
 
         newCurrentPoint : Point
         newCurrentPoint =
-            case cmdType of
+            case commandType of
                 MoveCommand endPoint ->
                     newCurrentPointFromEndPoint endPoint
 
@@ -808,7 +505,7 @@ updateInfoWithCommand info isRelative cmdType =
 
         newFirstConnectedPoint : Maybe Point
         newFirstConnectedPoint =
-            case ( firstCommandType, cmdType ) of
+            case ( firstCommandType, commandType ) of
                 ( _, MoveCommand _ ) ->
                     Nothing
 
@@ -821,232 +518,185 @@ updateInfoWithCommand info isRelative cmdType =
                 _ ->
                     info.firstConnectedPoint
     in
-    { path = newPath
-    , commands = newCommand :: info.commands
-    , state = info.state
+    { commands = newCommand :: info.commands
+    , state = newState
     , currentPoint = newCurrentPoint
     , firstConnectedPoint = newFirstConnectedPoint
     }
+
+
+moveCommand : Bool -> P.Parser CommandType
+moveCommand parsedOne =
+    let
+        commandType : Point -> CommandType
+        commandType =
+            if parsedOne then
+                LineCommand
+
+            else
+                MoveCommand
+    in
+    P.succeed commandType
+        |. P.spaces
+        |= point
+        |. P.spaces
+
+
+lineCommand : P.Parser CommandType
+lineCommand =
+    P.succeed LineCommand
+        |. P.spaces
+        |= point
+        |. P.spaces
+
+
+horizontalLineCommand : P.Parser CommandType
+horizontalLineCommand =
+    P.succeed HorizontalLineCommand
+        |. P.spaces
+        |= float
+        |. P.spaces
+
+
+verticalLineCommand : P.Parser CommandType
+verticalLineCommand =
+    P.succeed VerticalLineCommand
+        |. P.spaces
+        |= float
+        |. P.spaces
+
+
+cubicCurveCommand : P.Parser CommandType
+cubicCurveCommand =
+    P.succeed CubicCurveCommand
+        |. P.spaces
+        |= pointPair
+        |. P.spaces
+        |= point
+        |. P.spaces
+
+
+smoothCubicCurveCommand : P.Parser CommandType
+smoothCubicCurveCommand =
+    P.succeed SmoothCubicCurveCommand
+        |. P.spaces
+        |= point
+        |. P.spaces
+        |= point
+        |. P.spaces
+
+
+quadraticCurveCommand : P.Parser CommandType
+quadraticCurveCommand =
+    P.succeed QuadraticCurveCommand
+        |. P.spaces
+        |= point
+        |. P.spaces
+        |= point
+        |. P.spaces
+
+
+smoothQuadraticCurveCommand : P.Parser CommandType
+smoothQuadraticCurveCommand =
+    P.succeed SmoothQuadraticCurveCommand
+        |. P.spaces
+        |= point
+        |. P.spaces
+
+
+arcCommand : P.Parser CommandType
+arcCommand =
+    let
+        arcSizeFlag : P.Parser ArcSize
+        arcSizeFlag =
+            P.oneOf
+                [ P.map (\_ -> Large) (P.symbol "1")
+                , P.map (\_ -> Small) (P.symbol "0")
+                ]
+
+        arcRotationFlag : P.Parser ArcRotation
+        arcRotationFlag =
+            P.oneOf
+                [ P.map (\_ -> Clockwise) (P.symbol "1")
+                , P.map (\_ -> CounterClockwise) (P.symbol "0")
+                ]
+    in
+    P.succeed ArcCommand
+        |. P.spaces
+        |= (P.succeed ArcParameters
+                |= point
+                |. P.spaces
+                |= float
+                |. P.spaces
+                |= arcSizeFlag
+                |. P.spaces
+                |= arcRotationFlag
+           )
+        |. P.spaces
+        |= point
+        |. P.spaces
 
 
 parseStep : ParseInfo -> InfoParser
 parseStep info =
     case info.state of
         NotStarted ->
-            commandLetters info "M"
+            moveCommandLetter info
 
         ParsingCommand isRelative parsingCommandType ->
             let
-                command : InfoParser -> InfoParser -> Bool -> InfoParser
-                command commandArguments otherCommands parsedOne =
+                wrappedUpdateInfo : CommandType -> ParseInfo
+                wrappedUpdateInfo =
+                    updateInfoWithCommand info isRelative
+
+                command : P.Parser CommandType -> Bool -> InfoParser
+                command commandType parsedOne =
                     if parsedOne then
                         P.oneOf
-                            [ commandArguments
-                            , otherCommands
+                            [ P.map wrappedUpdateInfo commandType
+                            , allCommandLetters info
                             ]
 
                     else
-                        commandArguments
-
-                parseArgs newPCType commandType =
-                    P.map
-                        (updateInfoWithCommand
-                            { info
-                                | state = ParsingCommand isRelative newPCType
-                            }
-                            isRelative
-                        )
-                        commandType
-
-                moveCommand : (Point -> CommandType) -> InfoParser
-                moveCommand commandType =
-                    parseArgs
-                        (ParsingMove True)
-                        (P.succeed commandType
-                            |. P.spaces
-                            |= point
-                            |. P.spaces
-                        )
-
-                lineCommand : InfoParser
-                lineCommand =
-                    parseArgs
-                        (ParsingLine True)
-                        (P.succeed LineCommand
-                            |. P.spaces
-                            |= point
-                            |. P.spaces
-                        )
-
-                horizontalLineCommand : InfoParser
-                horizontalLineCommand =
-                    parseArgs
-                        (ParsingHorizontalLine True)
-                        (P.succeed HorizontalLineCommand
-                            |. P.spaces
-                            |= float
-                            |. P.spaces
-                        )
-
-                verticalLineCommand : InfoParser
-                verticalLineCommand =
-                    parseArgs
-                        (ParsingVerticalLine True)
-                        (P.succeed VerticalLineCommand
-                            |. P.spaces
-                            |= float
-                            |. P.spaces
-                        )
-
-                cubicCurveCommand : InfoParser
-                cubicCurveCommand =
-                    parseArgs
-                        (ParsingCubicCurve True)
-                        (P.succeed CubicCurveCommand
-                            |. P.spaces
-                            |= pointPair
-                            |. P.spaces
-                            |= point
-                            |. P.spaces
-                        )
-
-                smoothCubicCurveCommand : InfoParser
-                smoothCubicCurveCommand =
-                    parseArgs
-                        (ParsingSmoothCubicCurve True)
-                        (P.succeed SmoothCubicCurveCommand
-                            |. P.spaces
-                            |= point
-                            |. P.spaces
-                            |= point
-                            |. P.spaces
-                        )
-
-                quadraticCurveCommand : InfoParser
-                quadraticCurveCommand =
-                    parseArgs
-                        (ParsingQuadraticCurve True)
-                        (P.succeed QuadraticCurveCommand
-                            |. P.spaces
-                            |= point
-                            |. P.spaces
-                            |= point
-                            |. P.spaces
-                        )
-
-                smoothQuadraticCurveCommand : InfoParser
-                smoothQuadraticCurveCommand =
-                    parseArgs
-                        (ParsingSmoothQuadraticCurve True)
-                        (P.succeed SmoothQuadraticCurveCommand
-                            |. P.spaces
-                            |= point
-                            |. P.spaces
-                        )
-
-                arcCommand : InfoParser
-                arcCommand =
-                    let
-                        arcSizeFlag : P.Parser ArcSize
-                        arcSizeFlag =
-                            P.oneOf
-                                [ P.map (\_ -> Large) (P.symbol "1")
-                                , P.map (\_ -> Small) (P.symbol "0")
-                                ]
-
-                        arcRotationFlag : P.Parser ArcRotation
-                        arcRotationFlag =
-                            P.oneOf
-                                [ P.map (\_ -> Clockwise) (P.symbol "1")
-                                , P.map (\_ -> CounterClockwise) (P.symbol "0")
-                                ]
-                    in
-                    parseArgs
-                        (ParsingArc True)
-                        (P.succeed ArcCommand
-                            |. P.spaces
-                            |= (P.succeed ArcParameters
-                                    |= point
-                                    |. P.spaces
-                                    |= float
-                                    |. P.spaces
-                                    |= arcSizeFlag
-                                    |. P.spaces
-                                    |= arcRotationFlag
-                               )
-                            |. P.spaces
-                            |= point
-                            |. P.spaces
-                        )
+                        P.map wrappedUpdateInfo commandType
             in
             case parsingCommandType of
                 ParsingMove parsedOne ->
-                    let
-                        commandType : Point -> CommandType
-                        commandType =
-                            if parsedOne then
-                                LineCommand
-
-                            else
-                                MoveCommand
-                    in
-                    command
-                        (moveCommand commandType)
-                        (commandLetters info "MLHVCSQTAZ")
-                        parsedOne
+                    command (moveCommand parsedOne) parsedOne
 
                 ParsingLine parsedOne ->
-                    command
-                        lineCommand
-                        (commandLetters info "MLHVCSQTAZ")
-                        parsedOne
+                    command lineCommand parsedOne
 
                 ParsingHorizontalLine parsedOne ->
-                    command
-                        horizontalLineCommand
-                        (commandLetters info "MLHVCSQTAZ")
-                        parsedOne
+                    command horizontalLineCommand parsedOne
 
                 ParsingVerticalLine parsedOne ->
-                    command
-                        verticalLineCommand
-                        (commandLetters info "MLHVCSQTAZ")
-                        parsedOne
+                    command verticalLineCommand parsedOne
 
                 ParsingCubicCurve parsedOne ->
-                    command
-                        cubicCurveCommand
-                        (commandLetters info "MLHVCSQTAZ")
-                        parsedOne
+                    command cubicCurveCommand parsedOne
 
                 ParsingSmoothCubicCurve parsedOne ->
-                    command
-                        smoothCubicCurveCommand
-                        (commandLetters info "MLHVCSQTAZ")
-                        parsedOne
+                    command smoothCubicCurveCommand parsedOne
 
                 ParsingQuadraticCurve parsedOne ->
-                    command
-                        quadraticCurveCommand
-                        (commandLetters info "MLHVCSQTAZ")
-                        parsedOne
+                    command quadraticCurveCommand parsedOne
 
                 ParsingSmoothQuadraticCurve parsedOne ->
-                    command
-                        smoothQuadraticCurveCommand
-                        (commandLetters info "MLHVCSQTAZ")
-                        parsedOne
+                    command smoothQuadraticCurveCommand parsedOne
 
                 ParsingArc parsedOne ->
-                    command
-                        arcCommand
-                        (commandLetters info "MLHVCSQTAZ")
-                        parsedOne
+                    command arcCommand parsedOne
 
                 ParsingClose ->
+                    let
+                        updatedInfo : ParseInfo
+                        updatedInfo =
+                            updateInfoWithCommand info isRelative CloseCommand
+                    in
                     P.oneOf
-                        [ commandLetters info "MLHVCSQTAZ"
-                        , P.map (\_ -> info) (P.token " ")
+                        [ allCommandLetters updatedInfo
+                        , P.map (\_ -> updatedInfo) (P.token " ")
                         ]
 
 
@@ -1060,10 +710,7 @@ parseCommandString =
                     |> P.map
                         (\_ ->
                             P.Done
-                                { info
-                                    | path = List.reverse info.path
-                                    , commands = List.reverse info.commands
-                                }
+                                { info | commands = List.reverse info.commands }
                         )
                 , P.succeed
                     (\s -> P.Loop s)
@@ -1073,14 +720,135 @@ parseCommandString =
     P.loop initParseInfo helper
 
 
-fromString : String -> ( Path, Commands, String )
+fromString : String -> ( List Command, String )
 fromString string =
     case P.run parseCommandString string of
         Ok info ->
-            ( info.path, info.commands, "No Errors Found" )
+            ( info.commands, "No Errors Found" )
 
         Err _ ->
-            ( [], [], "Errors!" )
+            ( [], "Errors!" )
+
+
+
+-- UPDATE FUNCTIONS
+
+
+updateCommand : Int -> Point -> Command -> Command
+updateCommand secondary newPoint (Command isRelative commandType) =
+    let
+        currentCommand : Command
+        currentCommand =
+            Command isRelative commandType
+
+        updateCommandType : CommandType -> Command
+        updateCommandType updatedCommmandType =
+            Command isRelative updatedCommmandType
+
+        adjustedPoint : Point -> Point
+        adjustedPoint currentPoint =
+            if isRelative then
+                pointSubtract newPoint currentPoint
+
+            else
+                newPoint
+    in
+    case commandType of
+        MoveCommand currentPoint ->
+            updateCommandType <| MoveCommand (adjustedPoint currentPoint)
+
+        LineCommand currentPoint ->
+            updateCommandType <| LineCommand (adjustedPoint currentPoint)
+
+        HorizontalLineCommand x ->
+            let
+                newX : Float
+                newX =
+                    if isRelative then
+                        newPoint.x - x
+
+                    else
+                        x
+            in
+            updateCommandType (HorizontalLineCommand newX)
+
+        VerticalLineCommand y ->
+            let
+                newY : Float
+                newY =
+                    if isRelative then
+                        newPoint.y - y
+
+                    else
+                        y
+            in
+            updateCommandType (HorizontalLineCommand newY)
+
+        CubicCurveCommand controls currentPoint ->
+            if secondary == 3 then
+                updateCommandType <|
+                    CubicCurveCommand controls (adjustedPoint currentPoint)
+
+            else
+                currentCommand
+
+        SmoothCubicCurveCommand control currentPoint ->
+            if secondary == 2 then
+                updateCommandType <|
+                    SmoothCubicCurveCommand control (adjustedPoint currentPoint)
+
+            else
+                currentCommand
+
+        QuadraticCurveCommand control currentPoint ->
+            if secondary == 2 then
+                updateCommandType <|
+                    QuadraticCurveCommand control (adjustedPoint currentPoint)
+
+            else
+                currentCommand
+
+        SmoothQuadraticCurveCommand currentPoint ->
+            updateCommandType <|
+                SmoothQuadraticCurveCommand (adjustedPoint currentPoint)
+
+        ArcCommand params currentPoint ->
+            updateCommandType <|
+                ArcCommand params (adjustedPoint currentPoint)
+
+        CloseCommand ->
+            currentCommand
+
+
+updateCommandsAtIndex : Index2 -> Point -> List Command -> List Command
+updateCommandsAtIndex ( primary, secondary ) newPoint commands =
+    let
+        validUpdate : Bool
+        validUpdate =
+            primary < List.length commands && secondary > 0
+
+        targetCommand : Command
+        targetCommand =
+            List.drop primary commands
+                |> List.head
+                |> Maybe.withDefault (Command False CloseCommand)
+
+        updatedCommand : Command
+        updatedCommand =
+            updateCommand secondary newPoint targetCommand
+
+        updatedCommands : List Command
+        updatedCommands =
+            List.concat
+                [ List.take primary commands
+                , updatedCommand :: List.drop (primary + 1) commands
+                ]
+    in
+    if validUpdate then
+        updatedCommands
+
+    else
+        commands
 
 
 
@@ -1112,3 +880,243 @@ viewBoxRectFromString string =
 
         Err _ ->
             { x = 0, y = 0, width = 0, height = 0 }
+
+
+
+-- CONVERSION TO ABSOLUTE COMMANDS
+
+
+type alias ResolveInfo =
+    { absoluteCommands : List AbsoluteCommand
+    , currentPoint : Point
+    , firstConnectedPoint : Point
+    , previousAbsoluteCommand : Maybe AbsoluteCommand
+    }
+
+
+initResolveInfo : ResolveInfo
+initResolveInfo =
+    { absoluteCommands = []
+    , currentPoint = origin
+    , firstConnectedPoint = origin
+    , previousAbsoluteCommand = Nothing
+    }
+
+
+resolveStep : Command -> ResolveInfo -> ResolveInfo
+resolveStep (Command isRelative commandType) info =
+    case commandType of
+        MoveCommand endPoint ->
+            let
+                absoluteEndPoint : Point
+                absoluteEndPoint =
+                    absolutePoint info.currentPoint isRelative endPoint
+
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteMove absoluteEndPoint
+            in
+            { absoluteCommands = absoluteCommand :: info.absoluteCommands
+            , currentPoint = absoluteEndPoint
+            , firstConnectedPoint = absoluteEndPoint
+            , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+        LineCommand endPoint ->
+            let
+                absoluteEndPoint : Point
+                absoluteEndPoint =
+                    absolutePoint info.currentPoint isRelative endPoint
+
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteLine absoluteEndPoint
+            in
+            { info
+                | absoluteCommands = absoluteCommand :: info.absoluteCommands
+                , currentPoint = absoluteEndPoint
+                , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+        HorizontalLineCommand x ->
+            let
+                currentPoint : Point
+                currentPoint =
+                    info.currentPoint
+
+                absoluteEndPoint : Point
+                absoluteEndPoint =
+                    if isRelative then
+                        { currentPoint | x = currentPoint.x + x }
+
+                    else
+                        { currentPoint | x = x }
+
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteLine absoluteEndPoint
+            in
+            { info
+                | absoluteCommands = absoluteCommand :: info.absoluteCommands
+                , currentPoint = absoluteEndPoint
+                , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+        VerticalLineCommand y ->
+            let
+                currentPoint : Point
+                currentPoint =
+                    info.currentPoint
+
+                absoluteEndPoint : Point
+                absoluteEndPoint =
+                    if isRelative then
+                        { currentPoint | y = currentPoint.y + y }
+
+                    else
+                        { currentPoint | y = y }
+
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteLine absoluteEndPoint
+            in
+            { info
+                | absoluteCommands = absoluteCommand :: info.absoluteCommands
+                , currentPoint = absoluteEndPoint
+                , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+        CubicCurveCommand { start, end } endPoint ->
+            let
+                absoluteEndPoint : Point
+                absoluteEndPoint =
+                    absolutePoint info.currentPoint isRelative endPoint
+
+                absoluteControls : PointPair
+                absoluteControls =
+                    { start = absolutePoint info.currentPoint isRelative start
+                    , end = absolutePoint info.currentPoint isRelative end
+                    }
+
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteCubicCurve absoluteControls absoluteEndPoint
+            in
+            { info
+                | absoluteCommands = absoluteCommand :: info.absoluteCommands
+                , currentPoint = absoluteEndPoint
+                , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+        SmoothCubicCurveCommand control endPoint ->
+            let
+                absoluteEndPoint : Point
+                absoluteEndPoint =
+                    absolutePoint info.currentPoint isRelative endPoint
+
+                controlStart : Point
+                controlStart =
+                    case info.previousAbsoluteCommand of
+                        Just (AbsoluteCubicCurve { end } _) ->
+                            pointSubtract (pointScale 2 info.currentPoint) end
+
+                        _ ->
+                            info.currentPoint
+
+                absoluteControls : PointPair
+                absoluteControls =
+                    { start = controlStart
+                    , end = absolutePoint info.currentPoint isRelative control
+                    }
+
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteCubicCurve absoluteControls absoluteEndPoint
+            in
+            { info
+                | absoluteCommands = absoluteCommand :: info.absoluteCommands
+                , currentPoint = absoluteEndPoint
+                , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+        QuadraticCurveCommand control endPoint ->
+            let
+                absoluteEndPoint : Point
+                absoluteEndPoint =
+                    absolutePoint info.currentPoint isRelative endPoint
+
+                absoluteControl : Point
+                absoluteControl =
+                    absolutePoint info.currentPoint isRelative control
+
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteQuadraticCurve absoluteControl absoluteEndPoint
+            in
+            { info
+                | absoluteCommands = absoluteCommand :: info.absoluteCommands
+                , currentPoint = absoluteEndPoint
+                , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+        SmoothQuadraticCurveCommand endPoint ->
+            let
+                absoluteEndPoint : Point
+                absoluteEndPoint =
+                    absolutePoint info.currentPoint isRelative endPoint
+
+                control : Point
+                control =
+                    case info.previousAbsoluteCommand of
+                        Just (AbsoluteQuadraticCurve previousControl _) ->
+                            pointSubtract
+                                (pointScale 2 info.currentPoint)
+                                previousControl
+
+                        _ ->
+                            info.currentPoint
+
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteQuadraticCurve control absoluteEndPoint
+            in
+            { info
+                | absoluteCommands = absoluteCommand :: info.absoluteCommands
+                , currentPoint = absoluteEndPoint
+                , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+        ArcCommand parameters endPoint ->
+            let
+                absoluteEndPoint : Point
+                absoluteEndPoint =
+                    absolutePoint info.currentPoint isRelative endPoint
+
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteArc parameters absoluteEndPoint
+            in
+            { info
+                | absoluteCommands = absoluteCommand :: info.absoluteCommands
+                , currentPoint = absoluteEndPoint
+                , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+        CloseCommand ->
+            let
+                absoluteCommand : AbsoluteCommand
+                absoluteCommand =
+                    AbsoluteLine info.firstConnectedPoint
+            in
+            { info
+                | absoluteCommands = absoluteCommand :: info.absoluteCommands
+                , currentPoint = info.firstConnectedPoint
+                , previousAbsoluteCommand = Just absoluteCommand
+            }
+
+
+resolveRawCommands : List Command -> List AbsoluteCommand
+resolveRawCommands commands =
+    List.foldl resolveStep initResolveInfo commands
+        |> .absoluteCommands
+        |> List.reverse
