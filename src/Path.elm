@@ -785,7 +785,19 @@ updateCommand secondary newPoint (Command isRelative commandType) =
             updateCommandType (HorizontalLineCommand newY)
 
         CubicCurveCommand controls currentPoint ->
-            if secondary == 3 then
+            if secondary == 1 then
+                updateCommandType <|
+                    CubicCurveCommand
+                        { controls | start = adjustedPoint controls.start }
+                        currentPoint
+
+            else if secondary == 2 then
+                updateCommandType <|
+                    CubicCurveCommand
+                        { controls | end = adjustedPoint controls.end }
+                        currentPoint
+
+            else if secondary == 3 then
                 updateCommandType <|
                     CubicCurveCommand controls (adjustedPoint currentPoint)
 
@@ -793,7 +805,17 @@ updateCommand secondary newPoint (Command isRelative commandType) =
                 currentCommand
 
         SmoothCubicCurveCommand control currentPoint ->
-            if secondary == 2 then
+            if secondary == 1 then
+                updateCommandType <|
+                    CubicCurveCommand
+                        { start = adjustedPoint currentPoint, end = control }
+                        currentPoint
+
+            else if secondary == 2 then
+                updateCommandType <|
+                    SmoothCubicCurveCommand (adjustedPoint control) currentPoint
+
+            else if secondary == 3 then
                 updateCommandType <|
                     SmoothCubicCurveCommand control (adjustedPoint currentPoint)
 
@@ -801,7 +823,11 @@ updateCommand secondary newPoint (Command isRelative commandType) =
                 currentCommand
 
         QuadraticCurveCommand control currentPoint ->
-            if secondary == 2 then
+            if secondary == 1 then
+                updateCommandType <|
+                    QuadraticCurveCommand (adjustedPoint control) currentPoint
+
+            else if secondary == 2 then
                 updateCommandType <|
                     QuadraticCurveCommand control (adjustedPoint currentPoint)
 
@@ -809,8 +835,18 @@ updateCommand secondary newPoint (Command isRelative commandType) =
                 currentCommand
 
         SmoothQuadraticCurveCommand currentPoint ->
-            updateCommandType <|
-                SmoothQuadraticCurveCommand (adjustedPoint currentPoint)
+            if secondary == 1 then
+                updateCommandType <|
+                    QuadraticCurveCommand
+                        (adjustedPoint currentPoint)
+                        currentPoint
+
+            else if secondary == 2 then
+                updateCommandType <|
+                    SmoothQuadraticCurveCommand (adjustedPoint currentPoint)
+
+            else
+                currentCommand
 
         ArcCommand params currentPoint ->
             updateCommandType <|
