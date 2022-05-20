@@ -381,14 +381,22 @@ commandLetterToParsingType =
 commandLetter : ParseInfo -> ( String, ParsingCommandType ) -> InfoParser
 commandLetter info ( letter, parseType ) =
     let
+        newState : Bool -> ParseInfo
+        newState isRelative =
+            if letter == "Z" then
+                updateInfoWithCommand
+                    { info | state = ParsingCommand isRelative parseType }
+                    isRelative
+                    CloseCommand
+
+            else
+                { info | state = ParsingCommand isRelative parseType }
+
         commandCase : String -> Bool -> InfoParser
         commandCase letterCase isRelative =
             P.succeed ()
                 |. P.token letterCase
-                |> P.map
-                    (\_ ->
-                        { info | state = ParsingCommand isRelative parseType }
-                    )
+                |> P.map (\_ -> newState isRelative)
     in
     P.oneOf
         [ commandCase letter False
@@ -689,14 +697,9 @@ parseStep info =
                     command arcCommand parsedOne
 
                 ParsingClose ->
-                    let
-                        updatedInfo : ParseInfo
-                        updatedInfo =
-                            updateInfoWithCommand info isRelative CloseCommand
-                    in
                     P.oneOf
-                        [ allCommandLetters updatedInfo
-                        , P.map (\_ -> updatedInfo) (P.token " ")
+                        [ allCommandLetters info
+                        , P.map (\_ -> info) (P.token " ")
                         ]
 
 
