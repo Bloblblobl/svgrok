@@ -92,6 +92,10 @@ type alias InfoParser =
     P.Parser ParseInfo
 
 
+type alias TraversalPoints =
+    { currentPoint : Point, firstConnectedPoint : Point }
+
+
 
 -- STRING UTILS
 
@@ -156,6 +160,86 @@ absolutePoint currentPoint isRelative p =
 
     else
         p
+
+
+getEndPoint : List Command -> Point
+getEndPoint commands =
+    let
+        initialPoints : TraversalPoints
+        initialPoints =
+            { currentPoint = origin
+            , firstConnectedPoint = origin
+            }
+
+        traverse : Command -> TraversalPoints -> TraversalPoints
+        traverse (Command isRelative commandType) traversalPoints =
+            let
+                currentPoint : Point
+                currentPoint =
+                    traversalPoints.currentPoint
+
+                adjustPoint : Point -> Point
+                adjustPoint endPoint =
+                    if isRelative then
+                        pointAdd traversalPoints.currentPoint endPoint
+
+                    else
+                        endPoint
+            in
+            case commandType of
+                MoveCommand endPoint ->
+                    { currentPoint = adjustPoint endPoint
+                    , firstConnectedPoint = adjustPoint endPoint
+                    }
+
+                LineCommand endPoint ->
+                    { traversalPoints | currentPoint = adjustPoint endPoint }
+
+                HorizontalLineCommand x ->
+                    let
+                        newPoint : Point
+                        newPoint =
+                            if isRelative then
+                                { currentPoint | x = currentPoint.x + x }
+
+                            else
+                                { currentPoint | x = x }
+                    in
+                    { traversalPoints | currentPoint = newPoint }
+
+                VerticalLineCommand y ->
+                    let
+                        newPoint : Point
+                        newPoint =
+                            if isRelative then
+                                { currentPoint | y = currentPoint.y + y }
+
+                            else
+                                { currentPoint | y = y }
+                    in
+                    { traversalPoints | currentPoint = newPoint }
+
+                CubicCurveCommand _ endPoint ->
+                    { traversalPoints | currentPoint = adjustPoint endPoint }
+
+                SmoothCubicCurveCommand _ endPoint ->
+                    { traversalPoints | currentPoint = adjustPoint endPoint }
+
+                QuadraticCurveCommand _ endPoint ->
+                    { traversalPoints | currentPoint = adjustPoint endPoint }
+
+                SmoothQuadraticCurveCommand endPoint ->
+                    { traversalPoints | currentPoint = adjustPoint endPoint }
+
+                ArcCommand _ endPoint ->
+                    { traversalPoints | currentPoint = adjustPoint endPoint }
+
+                CloseCommand ->
+                    { traversalPoints
+                        | currentPoint = traversalPoints.firstConnectedPoint
+                    }
+    in
+    .currentPoint (List.foldl traverse initialPoints commands)
 
 
 
@@ -737,7 +821,54 @@ fromString string =
 -- UPDATE FUNCTIONS
 
 
-updateCommand : Int -> Point -> Command -> Command
+type alias UpdatedCommand =
+    { command : Command
+    , pointDifference : Point
+    }
+
+
+endPointIndex : Command -> Int
+endPointIndex (Command _ commandType) =
+    case commandType of
+        MoveCommand _ ->
+            1
+
+        LineCommand _ ->
+            1
+
+        HorizontalLineCommand _ ->
+            1
+
+        VerticalLineCommand _ ->
+            1
+
+        CubicCurveCommand _ _ ->
+            3
+
+        SmoothCubicCurveCommand _ _ ->
+            3
+
+        QuadraticCurveCommand _ _ ->
+            2
+
+        SmoothQuadraticCurveCommand _ ->
+            2
+
+        ArcCommand _ _ ->
+            1
+
+        CloseCommand ->
+            1
+
+
+
+{- Updates the Command component corresponding to the secondary index to
+   newPoint. If the command is relative, newPoint should be the new relative
+   value.
+-}
+
+
+updateCommand : Int -> Point -> Command -> UpdatedCommand
 updateCommand secondary newPoint (Command isRelative commandType) =
     let
         currentCommand : Command
@@ -747,147 +878,215 @@ updateCommand secondary newPoint (Command isRelative commandType) =
         updateCommandType : CommandType -> Command
         updateCommandType updatedCommmandType =
             Command isRelative updatedCommmandType
-
-        adjustedPoint : Point -> Point
-        adjustedPoint currentPoint =
-            if isRelative then
-                pointSubtract newPoint currentPoint
-
-            else
-                newPoint
     in
     case commandType of
         MoveCommand currentPoint ->
-            updateCommandType <| MoveCommand (adjustedPoint currentPoint)
+            { command = updateCommandType <| MoveCommand newPoint
+            , pointDifference = pointSubtract newPoint currentPoint
+            }
 
         LineCommand currentPoint ->
-            updateCommandType <| LineCommand (adjustedPoint currentPoint)
+            { command = updateCommandType <| LineCommand newPoint
+            , pointDifference = pointSubtract newPoint currentPoint
+            }
 
-        HorizontalLineCommand x ->
-            let
-                newX : Float
-                newX =
-                    if isRelative then
-                        newPoint.x - x
+        HorizontalLineCommand currentX ->
+            { command = updateCommandType (HorizontalLineCommand newPoint.x)
+            , pointDifference = { x = newPoint.x - currentX, y = 0 }
+            }
 
-                    else
-                        x
-            in
-            updateCommandType (HorizontalLineCommand newX)
-
-        VerticalLineCommand y ->
-            let
-                newY : Float
-                newY =
-                    if isRelative then
-                        newPoint.y - y
-
-                    else
-                        y
-            in
-            updateCommandType (HorizontalLineCommand newY)
+        VerticalLineCommand currentY ->
+            { command = updateCommandType (HorizontalLineCommand newPoint.y)
+            , pointDifference = { x = 0, y = newPoint.y - currentY }
+            }
 
         CubicCurveCommand controls currentPoint ->
             if secondary == 1 then
-                updateCommandType <|
-                    CubicCurveCommand
-                        { controls | start = adjustedPoint controls.start }
-                        currentPoint
+                { command =
+                    updateCommandType <|
+                        CubicCurveCommand
+                            { controls | start = newPoint }
+                            currentPoint
+                , pointDifference = origin
+                }
 
             else if secondary == 2 then
-                updateCommandType <|
-                    CubicCurveCommand
-                        { controls | end = adjustedPoint controls.end }
-                        currentPoint
+                { command =
+                    updateCommandType <|
+                        CubicCurveCommand
+                            { controls | end = newPoint }
+                            currentPoint
+                , pointDifference = origin
+                }
 
             else if secondary == 3 then
-                updateCommandType <|
-                    CubicCurveCommand controls (adjustedPoint currentPoint)
+                { command =
+                    updateCommandType <|
+                        CubicCurveCommand controls newPoint
+                , pointDifference = pointSubtract newPoint currentPoint
+                }
 
             else
-                currentCommand
+                { command = currentCommand, pointDifference = origin }
 
         SmoothCubicCurveCommand control currentPoint ->
             if secondary == 1 then
-                updateCommandType <|
-                    CubicCurveCommand
-                        { start = adjustedPoint currentPoint, end = control }
-                        currentPoint
+                { command =
+                    updateCommandType <|
+                        CubicCurveCommand
+                            { start = newPoint, end = control }
+                            currentPoint
+                , pointDifference = origin
+                }
 
             else if secondary == 2 then
-                updateCommandType <|
-                    SmoothCubicCurveCommand (adjustedPoint control) currentPoint
+                { command =
+                    updateCommandType <|
+                        SmoothCubicCurveCommand newPoint currentPoint
+                , pointDifference = origin
+                }
 
             else if secondary == 3 then
-                updateCommandType <|
-                    SmoothCubicCurveCommand control (adjustedPoint currentPoint)
+                { command =
+                    updateCommandType <|
+                        SmoothCubicCurveCommand control newPoint
+                , pointDifference = pointSubtract newPoint currentPoint
+                }
 
             else
-                currentCommand
+                { command = currentCommand, pointDifference = origin }
 
         QuadraticCurveCommand control currentPoint ->
             if secondary == 1 then
-                updateCommandType <|
-                    QuadraticCurveCommand (adjustedPoint control) currentPoint
+                { command =
+                    updateCommandType <|
+                        QuadraticCurveCommand newPoint currentPoint
+                , pointDifference = origin
+                }
 
             else if secondary == 2 then
-                updateCommandType <|
-                    QuadraticCurveCommand control (adjustedPoint currentPoint)
+                { command =
+                    updateCommandType <|
+                        QuadraticCurveCommand control newPoint
+                , pointDifference = pointSubtract newPoint currentPoint
+                }
 
             else
-                currentCommand
+                { command = currentCommand, pointDifference = origin }
 
         SmoothQuadraticCurveCommand currentPoint ->
             if secondary == 1 then
-                updateCommandType <|
-                    QuadraticCurveCommand
-                        (adjustedPoint currentPoint)
-                        currentPoint
+                { command =
+                    updateCommandType <|
+                        QuadraticCurveCommand newPoint currentPoint
+                , pointDifference = origin
+                }
 
             else if secondary == 2 then
-                updateCommandType <|
-                    SmoothQuadraticCurveCommand (adjustedPoint currentPoint)
+                { command =
+                    updateCommandType <|
+                        SmoothQuadraticCurveCommand newPoint
+                , pointDifference = pointSubtract newPoint currentPoint
+                }
 
             else
-                currentCommand
+                { command = currentCommand, pointDifference = origin }
 
         ArcCommand params currentPoint ->
-            updateCommandType <|
-                ArcCommand params (adjustedPoint currentPoint)
+            { command =
+                updateCommandType <|
+                    ArcCommand params newPoint
+            , pointDifference = pointSubtract newPoint currentPoint
+            }
 
         CloseCommand ->
-            currentCommand
+            { command = currentCommand, pointDifference = origin }
 
 
-updateCommandsAtIndex : Index2 -> Point -> List Command -> List Command
-updateCommandsAtIndex ( primary, secondary ) newPoint commands =
+updateCommands : Index2 -> Point -> List Command -> List Command
+updateCommands ( primary, secondary ) newPoint commands =
     let
-        validUpdate : Bool
-        validUpdate =
-            primary < List.length commands && secondary > 0
-
-        targetCommand : Command
+        targetCommand : Maybe Command
         targetCommand =
-            List.drop primary commands
-                |> List.head
-                |> Maybe.withDefault (Command False CloseCommand)
+            List.head (List.drop primary commands)
 
-        updatedCommand : Command
-        updatedCommand =
-            updateCommand secondary newPoint targetCommand
+        previousCommands : List Command
+        previousCommands =
+            List.take primary commands
 
-        updatedCommands : List Command
-        updatedCommands =
-            List.concat
-                [ List.take primary commands
-                , updatedCommand :: List.drop (primary + 1) commands
-                ]
+        nextCommand : Maybe Command
+        nextCommand =
+            List.head <| List.drop (primary + 1) commands
+
+        restCommands : List Command
+        restCommands =
+            List.drop (primary + 2) commands
+
+        pointDifference : Point
+        pointDifference =
+            pointSubtract newPoint <| getEndPoint previousCommands
+
+        -- updatedCommands : List Command
+        -- updatedCommands =
+        --     case ( targetCommand, nextCommand ) of
+        --         ( (Just (Command True tType)), (Just (Command True nType)) ) ->
+        --             let
+        --             in
+        --             []
+        --         ( (Just (Command True tType)), (Just (Command False nType)) ) ->
+        --             []
+        --         ( (Just ((Command False tType), (Just (Command True nType)) ) ->
+        --             []
+        --         ( Just (Command False tType), (Just (Command False nType) ) ->
+        --             []
+        --         _ ->
+        --             commands
+        -- updatedCommand : Maybe UpdatedCommand
+        -- updatedCommand =
+        --     Maybe.map
+        --         (\command ->
+        --             case command of
+        --                 Command True _ ->
+        --                     updateCommand secondary pointDifference command
+        --                 Command False _ ->
+        --                     updateCommand secondary newPoint command
+        --         )
+        --         targetCommand
+        -- updatedPointDifference : Point
+        -- updatedPointDifference =
+        --     .pointDifference <|
+        --         Maybe.withDefault
+        --             { command = Command False CloseCommand
+        --             , pointDifference = origin
+        --             }
+        --             updatedCommand
+        -- updatedNextCommand : Maybe Command
+        -- updatedNextCommand =
+        --     Maybe.map
+        --         (\command ->
+        --             case command of
+        --                 Command True _ ->
+        --                     .command <|
+        --                         updateCommand
+        --                             (endPointIndex command)
+        --                             updatedPointDifference
+        --                             command
+        --                 Command False _ ->
+        --                     command
+        --         )
+        --         nextCommand
+        -- updatedCommands : List Command
+        -- updatedCommands =
+        --     updatedCommand.command :: updatedNextCommand :: restCommands
     in
-    if validUpdate then
-        updatedCommands
+    case ( targetCommand, nextCommand ) of
+        ( Just target, Just next ) ->
+            []
 
-    else
-        commands
+        ( Just target, Nothing ) ->
+
+        _ ->
+            []
 
 
 

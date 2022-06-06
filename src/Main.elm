@@ -205,7 +205,7 @@ updateModel msg model =
                 updatedCommands =
                     case model.dragging of
                         Just index ->
-                            Path.updateCommandsAtIndex
+                            Path.updateCommands
                                 index
                                 transformedOffset
                                 model.path.commands
