@@ -1175,8 +1175,22 @@ updateCommands ( primary, secondary ) newAbsolutePoint commands =
 -- TODO: move this somewhere else
 
 
+type alias Grid =
+    { horizontal : Int, vertical : Int }
+
+
 type alias Rect =
     { x : Float, y : Float, width : Float, height : Float }
+
+
+snapToGrid : Grid -> Point -> Point
+snapToGrid grid { x, y } =
+    let
+        snap : Int -> Float -> Float
+        snap spacing value =
+            toFloat <| spacing * round (value / toFloat spacing)
+    in
+    { x = snap grid.horizontal x, y = snap grid.vertical y }
 
 
 parseViewBoxString : P.Parser Rect

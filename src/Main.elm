@@ -71,6 +71,7 @@ type alias Model =
     , mouseOverOverlay : Bool
     , mouseOffset : Point
     , dragging : Maybe Index2
+    , grid : Maybe Path.Grid
     }
 
 
@@ -118,6 +119,7 @@ initModel =
     , mouseOverOverlay = False
     , mouseOffset = { x = 0, y = 0 }
     , dragging = Nothing
+    , grid = Just { horizontal = 5, vertical = 5 }
     }
 
 
@@ -199,7 +201,17 @@ updateModel msg model =
 
                 transformedOffset : Point
                 transformedOffset =
-                    elementToViewBoxPoint model.config offset
+                    let
+                        viewBoxPoint : Point
+                        viewBoxPoint =
+                            elementToViewBoxPoint model.config offset
+                    in
+                    case model.grid of
+                        Just grid ->
+                            Path.snapToGrid grid viewBoxPoint
+
+                        Nothing ->
+                            viewBoxPoint
 
                 updatedCommands : List Path.Command
                 updatedCommands =
@@ -743,6 +755,62 @@ viewOverlayStep absoluteCommand overlayBuilder =
             viewArc overlayBuilder parameters endPoint
 
 
+viewOverlayGrid : Config -> Path.Grid -> Html Msg
+viewOverlayGrid config grid =
+    let
+        viewBox : Path.Rect
+        viewBox =
+            Path.viewBoxRectFromString config.viewBox
+
+        verticalLineCount : Int
+        verticalLineCount =
+            floor (viewBox.width / toFloat grid.horizontal)
+
+        firstX : Int
+        firstX =
+            floor (viewBox.x / toFloat grid.horizontal)
+
+        horizontalLineCount : Int
+        horizontalLineCount =
+            floor (viewBox.height / toFloat grid.vertical)
+
+        firstY : Int
+        firstY =
+            floor (viewBox.y / toFloat grid.vertical)
+
+        verticalLine : Int -> Html Msg
+        verticalLine index =
+            Svg.line
+                [ SvgA.x1 <| String.fromInt (firstX + index * grid.horizontal)
+                , SvgA.y1 <| String.fromFloat viewBox.y
+                , SvgA.x2 <| String.fromInt (firstX + index * grid.horizontal)
+                , SvgA.y2 <| String.fromFloat (viewBox.y + viewBox.height)
+                , SvgA.stroke "rgba(0, 0, 0, 0.1)"
+                ]
+                []
+
+        horizontalLine : Int -> Html Msg
+        horizontalLine index =
+            Svg.line
+                [ SvgA.x1 <| String.fromFloat viewBox.x
+                , SvgA.y1 <| String.fromInt (firstY + index * grid.vertical)
+                , SvgA.x2 <| String.fromFloat (viewBox.x + viewBox.width)
+                , SvgA.y2 <| String.fromInt (firstY + index * grid.vertical)
+                , SvgA.stroke "rgba(0, 0, 0, 0.1)"
+                ]
+                []
+
+        verticalLines : List (Html Msg)
+        verticalLines =
+            List.map verticalLine <| List.range 0 (verticalLineCount - 1)
+
+        horizontalLines : List (Html Msg)
+        horizontalLines =
+            List.map horizontalLine <| List.range 0 (horizontalLineCount - 1)
+    in
+    Svg.g [] (verticalLines ++ horizontalLines)
+
+
 getColorsResolver : Config -> Set Index2 -> Maybe Index2 -> Index2 -> Colors
 getColorsResolver config selected hovered index =
     let
@@ -771,8 +839,8 @@ getColorsResolver config selected hovered index =
     { strokeColor = strokeColor, pointColor = pointColor }
 
 
-viewOverlay : Config -> AnnotatedPath -> Html Msg
-viewOverlay config path =
+viewOverlay : Model -> Html Msg
+viewOverlay { config, path, grid } =
     let
         absoluteCommands : List Path.AbsoluteCommand
         absoluteCommands =
@@ -795,6 +863,15 @@ viewOverlay config path =
             List.append
                 (List.reverse builtOverlay.pathSegments)
                 (List.reverse builtOverlay.pathControls)
+
+        overlay : List (Html Msg)
+        overlay =
+            case grid of
+                Just g ->
+                    viewOverlayGrid config g :: sortedOverlay
+
+                Nothing ->
+                    sortedOverlay
     in
     Svg.svg
         [ SvgA.height config.editorHeight
@@ -805,7 +882,7 @@ viewOverlay config path =
         , SvgE.onMouseOut MouseOutOverlay
         , preserveAspectRatio
         ]
-        sortedOverlay
+        overlay
 
 
 viewCommandStrings : List Path.Command -> Html Msg
@@ -894,7 +971,7 @@ view model =
             []
         , viewPathConfig model.config
         , viewPath model
-        , viewOverlay model.config model.path
+        , viewOverlay model
         , viewInfo model
         , viewCommandStrings model.path.commands
         ]
