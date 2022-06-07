@@ -861,235 +861,317 @@ endPointIndex (Command _ commandType) =
             1
 
 
-
-{- Updates the Command component corresponding to the secondary index to
-   newPoint. If the command is relative, newPoint should be the new relative
-   value.
--}
-
-
-updateCommand : Int -> Point -> Command -> UpdatedCommand
-updateCommand secondary newPoint (Command isRelative commandType) =
+updateEndPoint : Point -> Command -> ( Command, Point )
+updateEndPoint newPoint (Command isRelative commandType) =
     let
-        currentCommand : Command
-        currentCommand =
-            Command isRelative commandType
-
         updateCommandType : CommandType -> Command
         updateCommandType updatedCommmandType =
             Command isRelative updatedCommmandType
     in
     case commandType of
         MoveCommand currentPoint ->
-            { command = updateCommandType <| MoveCommand newPoint
-            , pointDifference = pointSubtract newPoint currentPoint
-            }
+            ( updateCommandType (MoveCommand newPoint)
+            , pointSubtract newPoint currentPoint
+            )
 
         LineCommand currentPoint ->
-            { command = updateCommandType <| LineCommand newPoint
-            , pointDifference = pointSubtract newPoint currentPoint
-            }
+            ( updateCommandType (LineCommand newPoint)
+            , pointSubtract newPoint currentPoint
+            )
 
         HorizontalLineCommand currentX ->
-            { command = updateCommandType (HorizontalLineCommand newPoint.x)
-            , pointDifference = { x = newPoint.x - currentX, y = 0 }
-            }
+            ( updateCommandType (LineCommand newPoint)
+            , { x = newPoint.x - currentX, y = 0 }
+            )
 
         VerticalLineCommand currentY ->
-            { command = updateCommandType (HorizontalLineCommand newPoint.y)
-            , pointDifference = { x = 0, y = newPoint.y - currentY }
-            }
+            ( updateCommandType (LineCommand newPoint)
+            , { x = 0, y = newPoint.y - currentY }
+            )
 
         CubicCurveCommand controls currentPoint ->
-            if secondary == 1 then
-                { command =
-                    updateCommandType <|
-                        CubicCurveCommand
-                            { controls | start = newPoint }
-                            currentPoint
-                , pointDifference = origin
-                }
-
-            else if secondary == 2 then
-                { command =
-                    updateCommandType <|
-                        CubicCurveCommand
-                            { controls | end = newPoint }
-                            currentPoint
-                , pointDifference = origin
-                }
-
-            else if secondary == 3 then
-                { command =
-                    updateCommandType <|
-                        CubicCurveCommand controls newPoint
-                , pointDifference = pointSubtract newPoint currentPoint
-                }
-
-            else
-                { command = currentCommand, pointDifference = origin }
+            ( updateCommandType (CubicCurveCommand controls newPoint)
+            , pointSubtract newPoint currentPoint
+            )
 
         SmoothCubicCurveCommand control currentPoint ->
-            if secondary == 1 then
-                { command =
-                    updateCommandType <|
-                        CubicCurveCommand
-                            { start = newPoint, end = control }
-                            currentPoint
-                , pointDifference = origin
-                }
-
-            else if secondary == 2 then
-                { command =
-                    updateCommandType <|
-                        SmoothCubicCurveCommand newPoint currentPoint
-                , pointDifference = origin
-                }
-
-            else if secondary == 3 then
-                { command =
-                    updateCommandType <|
-                        SmoothCubicCurveCommand control newPoint
-                , pointDifference = pointSubtract newPoint currentPoint
-                }
-
-            else
-                { command = currentCommand, pointDifference = origin }
+            ( updateCommandType (SmoothCubicCurveCommand control newPoint)
+            , pointSubtract newPoint currentPoint
+            )
 
         QuadraticCurveCommand control currentPoint ->
-            if secondary == 1 then
-                { command =
-                    updateCommandType <|
-                        QuadraticCurveCommand newPoint currentPoint
-                , pointDifference = origin
-                }
-
-            else if secondary == 2 then
-                { command =
-                    updateCommandType <|
-                        QuadraticCurveCommand control newPoint
-                , pointDifference = pointSubtract newPoint currentPoint
-                }
-
-            else
-                { command = currentCommand, pointDifference = origin }
+            ( updateCommandType (QuadraticCurveCommand control newPoint)
+            , pointSubtract newPoint currentPoint
+            )
 
         SmoothQuadraticCurveCommand currentPoint ->
-            if secondary == 1 then
-                { command =
-                    updateCommandType <|
-                        QuadraticCurveCommand newPoint currentPoint
-                , pointDifference = origin
-                }
+            ( updateCommandType (SmoothQuadraticCurveCommand newPoint)
+            , pointSubtract newPoint currentPoint
+            )
 
-            else if secondary == 2 then
-                { command =
-                    updateCommandType <|
-                        SmoothQuadraticCurveCommand newPoint
-                , pointDifference = pointSubtract newPoint currentPoint
-                }
-
-            else
-                { command = currentCommand, pointDifference = origin }
-
-        ArcCommand params currentPoint ->
-            { command =
-                updateCommandType <|
-                    ArcCommand params newPoint
-            , pointDifference = pointSubtract newPoint currentPoint
-            }
+        ArcCommand parameters currentPoint ->
+            ( updateCommandType (ArcCommand parameters newPoint)
+            , pointSubtract newPoint currentPoint
+            )
 
         CloseCommand ->
-            { command = currentCommand, pointDifference = origin }
+            ( Command isRelative CloseCommand
+            , origin
+            )
+
+
+updateStartControl : Point -> Command -> Command
+updateStartControl newPoint (Command isRelative commandType) =
+    let
+        updateCommandType : CommandType -> Command
+        updateCommandType updatedCommmandType =
+            Command isRelative updatedCommmandType
+    in
+    case commandType of
+        CubicCurveCommand controls endPoint ->
+            updateCommandType <|
+                CubicCurveCommand
+                    { controls | start = newPoint }
+                    endPoint
+
+        SmoothCubicCurveCommand control endPoint ->
+            updateCommandType <|
+                CubicCurveCommand
+                    { start = newPoint, end = control }
+                    endPoint
+
+        _ ->
+            Command isRelative commandType
+
+
+updateEndControl : Point -> Command -> Command
+updateEndControl newPoint (Command isRelative commandType) =
+    let
+        updateCommandType : CommandType -> Command
+        updateCommandType updatedCommmandType =
+            Command isRelative updatedCommmandType
+    in
+    case commandType of
+        CubicCurveCommand controls endPoint ->
+            updateCommandType <|
+                CubicCurveCommand
+                    { controls | end = newPoint }
+                    endPoint
+
+        SmoothCubicCurveCommand _ endPoint ->
+            updateCommandType <| SmoothCubicCurveCommand newPoint endPoint
+
+        _ ->
+            Command isRelative commandType
+
+
+updateControl : Point -> Command -> Command
+updateControl newPoint (Command isRelative commandType) =
+    let
+        updateCommandType : CommandType -> Command
+        updateCommandType updatedCommmandType =
+            Command isRelative updatedCommmandType
+    in
+    case commandType of
+        QuadraticCurveCommand _ endPoint ->
+            updateCommandType <| QuadraticCurveCommand newPoint endPoint
+
+        SmoothQuadraticCurveCommand endPoint ->
+            updateCommandType <| QuadraticCurveCommand newPoint endPoint
+
+        _ ->
+            Command isRelative commandType
+
+
+updateRelativeCommand : Point -> Command -> Command
+updateRelativeCommand pointDifference (Command _ commandType) =
+    let
+        updatePoint : Point -> Point
+        updatePoint oldPoint =
+            pointSubtract oldPoint pointDifference
+
+        updateCommandType : CommandType -> Command
+        updateCommandType updatedCommmandType =
+            Command True updatedCommmandType
+    in
+    case commandType of
+        MoveCommand endPoint ->
+            updateCommandType <| MoveCommand (updatePoint endPoint)
+
+        LineCommand endPoint ->
+            updateCommandType <| LineCommand (updatePoint endPoint)
+
+        HorizontalLineCommand x ->
+            updateCommandType <| HorizontalLineCommand (x - pointDifference.x)
+
+        VerticalLineCommand y ->
+            updateCommandType <| VerticalLineCommand (y - pointDifference.y)
+
+        CubicCurveCommand { start, end } endPoint ->
+            updateCommandType <|
+                CubicCurveCommand
+                    { start = updatePoint start, end = updatePoint end }
+                    (updatePoint endPoint)
+
+        SmoothCubicCurveCommand control endPoint ->
+            updateCommandType <|
+                SmoothCubicCurveCommand
+                    (updatePoint control)
+                    (updatePoint endPoint)
+
+        QuadraticCurveCommand control endPoint ->
+            updateCommandType <|
+                QuadraticCurveCommand
+                    (updatePoint control)
+                    (updatePoint endPoint)
+
+        SmoothQuadraticCurveCommand endPoint ->
+            updateCommandType <|
+                SmoothQuadraticCurveCommand (updatePoint endPoint)
+
+        ArcCommand parameters endPoint ->
+            updateCommandType <| ArcCommand parameters (updatePoint endPoint)
+
+        CloseCommand ->
+            updateCommandType commandType
+
+
+type CommandComponent
+    = EndPoint
+    | StartControl
+    | EndControl
+    | Control
+
+
+getCommandComponent : Int -> Command -> CommandComponent
+getCommandComponent secondary (Command _ commandType) =
+    case ( commandType, secondary ) of
+        ( CubicCurveCommand _ _, 1 ) ->
+            StartControl
+
+        ( SmoothCubicCurveCommand _ _, 1 ) ->
+            StartControl
+
+        ( CubicCurveCommand _ _, 2 ) ->
+            EndControl
+
+        ( SmoothCubicCurveCommand _ _, 2 ) ->
+            EndControl
+
+        ( QuadraticCurveCommand _ _, 1 ) ->
+            Control
+
+        ( SmoothQuadraticCurveCommand _, 1 ) ->
+            Control
+
+        _ ->
+            EndPoint
+
+
+updateCommand : Int -> Point -> Command -> List Command -> List Command
+updateCommand secondary newPoint command nextCommands =
+    let
+        commandComponent : CommandComponent
+        commandComponent =
+            getCommandComponent secondary command
+
+        updatedCommand : Command
+        updatedCommand =
+            case commandComponent of
+                EndPoint ->
+                    Tuple.first (updateEndPoint newPoint command)
+
+                StartControl ->
+                    updateStartControl newPoint command
+
+                EndControl ->
+                    updateEndControl newPoint command
+
+                Control ->
+                    updateControl newPoint command
+
+        updateNextCommand : Command -> Command
+        updateNextCommand (Command isRelative commandType) =
+            let
+                nextCommand : Command
+                nextCommand =
+                    Command isRelative commandType
+
+                pointDifference : Point
+                pointDifference =
+                    Tuple.second (updateEndPoint newPoint command)
+            in
+            case ( isRelative, commandComponent ) of
+                ( True, EndPoint ) ->
+                    updateRelativeCommand pointDifference nextCommand
+
+                _ ->
+                    nextCommand
+
+        updatedNextCommand : Maybe Command
+        updatedNextCommand =
+            Maybe.map updateNextCommand (List.head nextCommands)
+
+        updatedNextCommands : List Command
+        updatedNextCommands =
+            case updatedNextCommand of
+                Just nextCommand ->
+                    nextCommand :: List.drop 1 nextCommands
+
+                Nothing ->
+                    nextCommands
+    in
+    updatedCommand :: updatedNextCommands
 
 
 updateCommands : Index2 -> Point -> List Command -> List Command
-updateCommands ( primary, secondary ) newPoint commands =
+updateCommands ( primary, secondary ) newAbsolutePoint commands =
     let
-        targetCommand : Maybe Command
-        targetCommand =
-            List.head (List.drop primary commands)
-
         previousCommands : List Command
         previousCommands =
             List.take primary commands
 
-        nextCommand : Maybe Command
-        nextCommand =
-            List.head <| List.drop (primary + 1) commands
+        targetCommand : Maybe Command
+        targetCommand =
+            List.head (List.drop primary commands)
 
-        restCommands : List Command
-        restCommands =
-            List.drop (primary + 2) commands
-
-        pointDifference : Point
-        pointDifference =
-            pointSubtract newPoint <| getEndPoint previousCommands
-
-        -- updatedCommands : List Command
-        -- updatedCommands =
-        --     case ( targetCommand, nextCommand ) of
-        --         ( (Just (Command True tType)), (Just (Command True nType)) ) ->
-        --             let
-        --             in
-        --             []
-        --         ( (Just (Command True tType)), (Just (Command False nType)) ) ->
-        --             []
-        --         ( (Just ((Command False tType), (Just (Command True nType)) ) ->
-        --             []
-        --         ( Just (Command False tType), (Just (Command False nType) ) ->
-        --             []
-        --         _ ->
-        --             commands
-        -- updatedCommand : Maybe UpdatedCommand
-        -- updatedCommand =
-        --     Maybe.map
-        --         (\command ->
-        --             case command of
-        --                 Command True _ ->
-        --                     updateCommand secondary pointDifference command
-        --                 Command False _ ->
-        --                     updateCommand secondary newPoint command
-        --         )
-        --         targetCommand
-        -- updatedPointDifference : Point
-        -- updatedPointDifference =
-        --     .pointDifference <|
-        --         Maybe.withDefault
-        --             { command = Command False CloseCommand
-        --             , pointDifference = origin
-        --             }
-        --             updatedCommand
-        -- updatedNextCommand : Maybe Command
-        -- updatedNextCommand =
-        --     Maybe.map
-        --         (\command ->
-        --             case command of
-        --                 Command True _ ->
-        --                     .command <|
-        --                         updateCommand
-        --                             (endPointIndex command)
-        --                             updatedPointDifference
-        --                             command
-        --                 Command False _ ->
-        --                     command
-        --         )
-        --         nextCommand
-        -- updatedCommands : List Command
-        -- updatedCommands =
-        --     updatedCommand.command :: updatedNextCommand :: restCommands
+        nextCommands : List Command
+        nextCommands =
+            List.drop (primary + 1) commands
     in
-    case ( targetCommand, nextCommand ) of
-        ( Just target, Just next ) ->
-            []
+    case targetCommand of
+        Just (Command True commandType) ->
+            let
+                command : Command
+                command =
+                    Command True commandType
 
-        ( Just target, Nothing ) ->
+                newPoint : Point
+                newPoint =
+                    pointSubtract
+                        newAbsolutePoint
+                        (getEndPoint previousCommands)
+            in
+            List.append
+                previousCommands
+                (updateCommand secondary newPoint command nextCommands)
 
-        _ ->
-            []
+        Just (Command False commandType) ->
+            let
+                command : Command
+                command =
+                    Command False commandType
+            in
+            List.append
+                previousCommands
+                (updateCommand secondary newAbsolutePoint command nextCommands)
+
+        Nothing ->
+            commands
 
 
 
+-- UTIL FUNCTIONS
 -- TODO: move this somewhere else
 
 
@@ -1118,6 +1200,46 @@ viewBoxRectFromString string =
 
         Err _ ->
             { x = 0, y = 0, width = 0, height = 0 }
+
+
+{-| Rounds the number to the specified significant digits.
+-}
+roundSignificantly : Int -> Float -> Float
+roundSignificantly digits number =
+    let
+        roundedString : String
+        roundedString =
+            number
+                * toFloat (10 ^ digits)
+                |> round
+                |> String.fromInt
+
+        roundedLength : Int
+        roundedLength =
+            String.length roundedString
+    in
+    if roundedLength < digits then
+        String.concat
+            [ "."
+            , String.repeat (digits - roundedLength) "0"
+            , roundedString
+            ]
+            |> String.toFloat
+            |> Maybe.withDefault 0
+
+    else
+        String.concat
+            [ String.dropRight digits roundedString
+            , "."
+            , String.dropLeft (roundedLength - digits) roundedString
+            ]
+            |> String.toFloat
+            |> Maybe.withDefault 0
+
+
+round2 : Float -> Float
+round2 =
+    roundSignificantly 2
 
 
 
@@ -1252,8 +1374,8 @@ resolveStep (Command isRelative commandType) info =
                 absoluteEndPoint =
                     absolutePoint info.currentPoint isRelative endPoint
 
-                controlStart : Point
-                controlStart =
+                startControl : Point
+                startControl =
                     case info.previousAbsoluteCommand of
                         Just (AbsoluteCubicCurve { end } _) ->
                             pointSubtract (pointScale 2 info.currentPoint) end
@@ -1263,7 +1385,7 @@ resolveStep (Command isRelative commandType) info =
 
                 absoluteControls : PointPair
                 absoluteControls =
-                    { start = controlStart
+                    { start = startControl
                     , end = absolutePoint info.currentPoint isRelative control
                     }
 
