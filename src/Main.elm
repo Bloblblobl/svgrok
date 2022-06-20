@@ -6,7 +6,8 @@ import Html exposing (Html)
 import Html.Attributes as HtmlA
 import Html.Events as HtmlE
 import Json.Decode as JsonD
-import Path exposing (Index2, Point, PointPair)
+import Path exposing (Index2)
+import Point exposing (Point)
 import Set exposing (Set)
 import Svg
 import Svg.Attributes as SvgA
@@ -352,7 +353,7 @@ initOverlayBuilder : Config -> (Index2 -> Colors) -> OverlayBuilder
 initOverlayBuilder config colorsResolver =
     { pathSegments = []
     , pathControls = []
-    , currentPoint = Path.origin
+    , currentPoint = Point.zero
     , index = ( 0, 0 )
     , config = config
     , colorsResolver = colorsResolver
@@ -541,7 +542,7 @@ viewLine overlayBuilder endPoint =
     }
 
 
-viewCubicCurve : OverlayBuilder -> PointPair -> Point -> OverlayBuilder
+viewCubicCurve : OverlayBuilder -> Point.Pair -> Point -> OverlayBuilder
 viewCubicCurve overlayBuilder controls endPoint =
     let
         controlStartIndex : Index2

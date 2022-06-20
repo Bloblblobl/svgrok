@@ -1,18 +1,11 @@
 module Path exposing (..)
 
 import Parser as P exposing ((|.), (|=))
+import Point exposing (Point)
 
 
 
 -- TYPES
-
-
-type alias Point =
-    { x : Float, y : Float }
-
-
-type alias PointPair =
-    { start : Point, end : Point }
 
 
 type alias Index2 =
@@ -42,7 +35,7 @@ type CommandType
     | LineCommand Point
     | HorizontalLineCommand Float
     | VerticalLineCommand Float
-    | CubicCurveCommand PointPair Point
+    | CubicCurveCommand Point.Pair Point
     | SmoothCubicCurveCommand Point Point
     | QuadraticCurveCommand Point Point
     | SmoothQuadraticCurveCommand Point
@@ -57,7 +50,7 @@ type Command
 type AbsoluteCommand
     = AbsoluteMove Point
     | AbsoluteLine Point
-    | AbsoluteCubicCurve PointPair Point
+    | AbsoluteCubicCurve Point.Pair Point
     | AbsoluteQuadraticCurve Point Point
     | AbsoluteArc ArcParameters Point
 
@@ -114,49 +107,10 @@ wrapBraces string =
 -- POINT FUNCTIONS
 
 
-origin : Point
-origin =
-    { x = 0, y = 0 }
-
-
-originPair : PointPair
-originPair =
-    { start = origin, end = origin }
-
-
-pointScale : Float -> Point -> Point
-pointScale scale { x, y } =
-    { x = scale * x
-    , y = scale * y
-    }
-
-
-pointOperate : (Float -> Float -> Float) -> Point -> Point -> Point
-pointOperate op point1 point2 =
-    { x = op point1.x point2.x
-    , y = op point1.y point2.y
-    }
-
-
-pointAdd : Point -> Point -> Point
-pointAdd =
-    pointOperate (+)
-
-
-pointSubtract : Point -> Point -> Point
-pointSubtract =
-    pointOperate (-)
-
-
-pointPairToVector : PointPair -> Point
-pointPairToVector pair =
-    pointSubtract pair.end pair.start
-
-
 absolutePoint : Point -> Bool -> Point -> Point
 absolutePoint currentPoint isRelative p =
     if isRelative then
-        pointAdd currentPoint p
+        Point.add currentPoint p
 
     else
         p
@@ -167,8 +121,8 @@ getEndPoint commands =
     let
         initialPoints : TraversalPoints
         initialPoints =
-            { currentPoint = origin
-            , firstConnectedPoint = origin
+            { currentPoint = Point.zero
+            , firstConnectedPoint = Point.zero
             }
 
         traverse : Command -> TraversalPoints -> TraversalPoints
@@ -181,7 +135,7 @@ getEndPoint commands =
                 adjustPoint : Point -> Point
                 adjustPoint endPoint =
                     if isRelative then
-                        pointAdd traversalPoints.currentPoint endPoint
+                        Point.add traversalPoints.currentPoint endPoint
 
                     else
                         endPoint
@@ -251,7 +205,7 @@ pointToString p =
     String.fromFloat p.x ++ "," ++ String.fromFloat p.y
 
 
-pointPairToString : PointPair -> String
+pointPairToString : Point.Pair -> String
 pointPairToString { start, end } =
     String.concat
         [ "start: "
@@ -411,7 +365,7 @@ initParseInfo : ParseInfo
 initParseInfo =
     { commands = []
     , state = NotStarted
-    , currentPoint = origin
+    , currentPoint = Point.zero
     , firstConnectedPoint = Nothing
     }
 
@@ -439,9 +393,9 @@ point =
         |= float
 
 
-pointPair : P.Parser PointPair
+pointPair : P.Parser Point.Pair
 pointPair =
-    P.succeed PointPair
+    P.succeed Point.Pair
         |= point
         |. P.spaces
         |= point
@@ -545,7 +499,7 @@ updateInfoWithCommand info isRelative commandType =
         newCurrentPointFromEndPoint : Point -> Point
         newCurrentPointFromEndPoint endPoint =
             if isRelative then
-                pointAdd currentPoint endPoint
+                Point.add currentPoint endPoint
 
             else
                 endPoint
@@ -561,14 +515,14 @@ updateInfoWithCommand info isRelative commandType =
 
                 HorizontalLineCommand x ->
                     if isRelative then
-                        pointAdd currentPoint { x = x, y = 0 }
+                        Point.add currentPoint { x = x, y = 0 }
 
                     else
                         { currentPoint | x = x }
 
                 VerticalLineCommand y ->
                     if isRelative then
-                        pointAdd currentPoint { x = 0, y = y }
+                        Point.add currentPoint { x = 0, y = y }
 
                     else
                         { currentPoint | y = y }
@@ -589,7 +543,7 @@ updateInfoWithCommand info isRelative commandType =
                     newCurrentPointFromEndPoint endPoint
 
                 CloseCommand ->
-                    Maybe.withDefault origin info.firstConnectedPoint
+                    Maybe.withDefault Point.zero info.firstConnectedPoint
 
         firstCommandType : Maybe CommandType
         firstCommandType =
@@ -871,12 +825,12 @@ updateEndPoint newPoint (Command isRelative commandType) =
     case commandType of
         MoveCommand currentPoint ->
             ( updateCommandType (MoveCommand newPoint)
-            , pointSubtract newPoint currentPoint
+            , Point.subtract newPoint currentPoint
             )
 
         LineCommand currentPoint ->
             ( updateCommandType (LineCommand newPoint)
-            , pointSubtract newPoint currentPoint
+            , Point.subtract newPoint currentPoint
             )
 
         HorizontalLineCommand currentX ->
@@ -891,32 +845,32 @@ updateEndPoint newPoint (Command isRelative commandType) =
 
         CubicCurveCommand controls currentPoint ->
             ( updateCommandType (CubicCurveCommand controls newPoint)
-            , pointSubtract newPoint currentPoint
+            , Point.subtract newPoint currentPoint
             )
 
         SmoothCubicCurveCommand control currentPoint ->
             ( updateCommandType (SmoothCubicCurveCommand control newPoint)
-            , pointSubtract newPoint currentPoint
+            , Point.subtract newPoint currentPoint
             )
 
         QuadraticCurveCommand control currentPoint ->
             ( updateCommandType (QuadraticCurveCommand control newPoint)
-            , pointSubtract newPoint currentPoint
+            , Point.subtract newPoint currentPoint
             )
 
         SmoothQuadraticCurveCommand currentPoint ->
             ( updateCommandType (SmoothQuadraticCurveCommand newPoint)
-            , pointSubtract newPoint currentPoint
+            , Point.subtract newPoint currentPoint
             )
 
         ArcCommand parameters currentPoint ->
             ( updateCommandType (ArcCommand parameters newPoint)
-            , pointSubtract newPoint currentPoint
+            , Point.subtract newPoint currentPoint
             )
 
         CloseCommand ->
             ( Command isRelative CloseCommand
-            , origin
+            , Point.zero
             )
 
 
@@ -988,7 +942,7 @@ updateRelativeCommand pointDifference (Command _ commandType) =
     let
         updatePoint : Point -> Point
         updatePoint oldPoint =
-            pointSubtract oldPoint pointDifference
+            Point.subtract oldPoint pointDifference
 
         updateCommandType : CommandType -> Command
         updateCommandType updatedCommmandType =
@@ -1148,7 +1102,7 @@ updateCommands ( primary, secondary ) newAbsolutePoint commands =
 
                 newPoint : Point
                 newPoint =
-                    pointSubtract
+                    Point.subtract
                         newAbsolutePoint
                         (getEndPoint previousCommands)
             in
@@ -1271,8 +1225,8 @@ type alias ResolveInfo =
 initResolveInfo : ResolveInfo
 initResolveInfo =
     { absoluteCommands = []
-    , currentPoint = origin
-    , firstConnectedPoint = origin
+    , currentPoint = Point.zero
+    , firstConnectedPoint = Point.zero
     , previousAbsoluteCommand = Nothing
     }
 
@@ -1366,7 +1320,7 @@ resolveStep (Command isRelative commandType) info =
                 absoluteEndPoint =
                     absolutePoint info.currentPoint isRelative endPoint
 
-                absoluteControls : PointPair
+                absoluteControls : Point.Pair
                 absoluteControls =
                     { start = absolutePoint info.currentPoint isRelative start
                     , end = absolutePoint info.currentPoint isRelative end
@@ -1392,12 +1346,12 @@ resolveStep (Command isRelative commandType) info =
                 startControl =
                     case info.previousAbsoluteCommand of
                         Just (AbsoluteCubicCurve { end } _) ->
-                            pointSubtract (pointScale 2 info.currentPoint) end
+                            Point.subtract (Point.scale 2 info.currentPoint) end
 
                         _ ->
                             info.currentPoint
 
-                absoluteControls : PointPair
+                absoluteControls : Point.Pair
                 absoluteControls =
                     { start = startControl
                     , end = absolutePoint info.currentPoint isRelative control
@@ -1443,8 +1397,8 @@ resolveStep (Command isRelative commandType) info =
                 control =
                     case info.previousAbsoluteCommand of
                         Just (AbsoluteQuadraticCurve previousControl _) ->
-                            pointSubtract
-                                (pointScale 2 info.currentPoint)
+                            Point.subtract
+                                (Point.scale 2 info.currentPoint)
                                 previousControl
 
                         _ ->
