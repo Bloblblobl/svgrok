@@ -90,20 +90,6 @@ type alias TraversalPoints =
 
 
 
--- STRING UTILS
-
-
-wrapParens : String -> String
-wrapParens string =
-    "(" ++ string ++ ")"
-
-
-wrapBraces : String -> String
-wrapBraces string =
-    "{" ++ string ++ "}"
-
-
-
 -- POINT FUNCTIONS
 
 
@@ -200,22 +186,6 @@ getEndPoint commands =
 -- TO STRING FUNCTIONS
 
 
-pointToString : Point -> String
-pointToString p =
-    String.fromFloat p.x ++ "," ++ String.fromFloat p.y
-
-
-pointPairToString : Point.Pair -> String
-pointPairToString { start, end } =
-    String.concat
-        [ "start: "
-        , wrapParens (pointToString start)
-        , ", end: "
-        , wrapParens (pointToString end)
-        ]
-        |> wrapBraces
-
-
 arcSizeToString : ArcSize -> String
 arcSizeToString size =
     case size of
@@ -251,12 +221,12 @@ commandToString (Command isRelative cmdType) =
         (case cmdType of
             MoveCommand endPoint ->
                 [ letterCase "M"
-                , pointToString endPoint
+                , Point.toString endPoint
                 ]
 
             LineCommand endPoint ->
                 [ letterCase "L"
-                , pointToString endPoint
+                , Point.toString endPoint
                 ]
 
             HorizontalLineCommand x ->
@@ -271,26 +241,26 @@ commandToString (Command isRelative cmdType) =
 
             CubicCurveCommand controls endPoint ->
                 [ letterCase "C"
-                , pointToString controls.start
-                , pointToString controls.end
-                , pointToString endPoint
+                , Point.toString controls.start
+                , Point.toString controls.end
+                , Point.toString endPoint
                 ]
 
             SmoothCubicCurveCommand control endPoint ->
                 [ letterCase "S"
-                , pointToString control
-                , pointToString endPoint
+                , Point.toString control
+                , Point.toString endPoint
                 ]
 
             QuadraticCurveCommand control endPoint ->
                 [ letterCase "Q"
-                , pointToString control
-                , pointToString endPoint
+                , Point.toString control
+                , Point.toString endPoint
                 ]
 
             SmoothQuadraticCurveCommand endPoint ->
                 [ letterCase "T"
-                , pointToString endPoint
+                , Point.toString endPoint
                 ]
 
             ArcCommand { radii, angle, size, rotation } endPoint ->
@@ -300,7 +270,7 @@ commandToString (Command isRelative cmdType) =
                 , String.fromFloat angle
                 , arcSizeToString size
                 , arcRotationToString rotation
-                , pointToString endPoint
+                , Point.toString endPoint
                 ]
 
             CloseCommand ->
@@ -317,24 +287,24 @@ absoluteCommandToString : AbsoluteCommand -> String
 absoluteCommandToString absoluteCommand =
     case absoluteCommand of
         AbsoluteMove endPoint ->
-            "M " ++ pointToString endPoint
+            "M " ++ Point.toString endPoint
 
         AbsoluteLine endPoint ->
-            "L " ++ pointToString endPoint
+            "L " ++ Point.toString endPoint
 
         AbsoluteCubicCurve controls endPoint ->
             String.join " "
                 [ "C"
-                , pointToString controls.start
-                , pointToString controls.end
-                , pointToString endPoint
+                , Point.toString controls.start
+                , Point.toString controls.end
+                , Point.toString endPoint
                 ]
 
         AbsoluteQuadraticCurve control endPoint ->
             String.join " "
                 [ "Q"
-                , pointToString control
-                , pointToString endPoint
+                , Point.toString control
+                , Point.toString endPoint
                 ]
 
         AbsoluteArc params endPoint ->
@@ -345,7 +315,7 @@ absoluteCommandToString absoluteCommand =
                 , String.fromFloat params.angle
                 , arcSizeToString params.size
                 , arcRotationToString params.rotation
-                , pointToString endPoint
+                , Point.toString endPoint
                 ]
 
 

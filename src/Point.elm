@@ -30,6 +30,22 @@ subtract point1 point2 =
     }
 
 
+toString : Point -> String
+toString point =
+    String.fromFloat point.x ++ "," ++ String.fromFloat point.y
+
+
+pairToString : Pair -> String
+pairToString { start, end } =
+    String.concat
+        [ "{ start: ("
+        , toString start
+        , "), end: ("
+        , toString end
+        , ") }"
+        ]
+
+
 zero : Point
 zero =
     { x = 0, y = 0 }
