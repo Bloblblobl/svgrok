@@ -5,41 +5,6 @@ import Path2 as Path exposing (Command, Path)
 import Point exposing (Point)
 
 
-{-| Aliases for all the Command parameters to make the parsers easier to build.
--}
-type alias BaseParameters =
-    { to : Point }
-
-
-type alias HorizontalLineParameters =
-    { toX : Float }
-
-
-type alias VerticalLineParameters =
-    { toY : Float }
-
-
-type alias CubicCurveParameters =
-    { startControl : Point, endControl : Point, to : Point }
-
-
-type alias SmoothCubicCurveParameters =
-    { endControl : Point, to : Point }
-
-
-type alias QuadraticCurveParameters =
-    { control : Point, to : Point }
-
-
-type alias ArcParameters =
-    { radii : Point
-    , angle : Float
-    , size : Path.ArcSize
-    , rotation : Path.ArcRotation
-    , to : Point
-    }
-
-
 {-| An iteration of a Parser.loop call where the type of the intermediate state
 is the same as the result.
 -}
@@ -197,88 +162,6 @@ point =
         |= float
 
 
-{-| Parse all CommandTypes
--}
-moveParameters : Parser Path.CommandType
-moveParameters =
-    P.succeed BaseParameters
-        |. separator
-        |= point
-        |. separator
-        |> P.map Path.MoveCommand
-
-
-lineParameters : Parser Path.CommandType
-lineParameters =
-    P.succeed BaseParameters
-        |. separator
-        |= point
-        |. separator
-        |> P.map Path.LineCommand
-
-
-horizontalLineParameters : Parser Path.CommandType
-horizontalLineParameters =
-    P.succeed HorizontalLineParameters
-        |. separator
-        |= float
-        |. separator
-        |> P.map Path.HorizontalLineCommand
-
-
-verticalLineParameters : Parser Path.CommandType
-verticalLineParameters =
-    P.succeed VerticalLineParameters
-        |. separator
-        |= float
-        |. separator
-        |> P.map Path.VerticalLineCommand
-
-
-cubicCurveParameters : Parser Path.CommandType
-cubicCurveParameters =
-    P.succeed CubicCurveParameters
-        |. separator
-        |= point
-        |. separator
-        |= point
-        |. separator
-        |= point
-        |. separator
-        |> P.map Path.CubicCurveCommand
-
-
-smoothCubicCurveParameters : Parser Path.CommandType
-smoothCubicCurveParameters =
-    P.succeed SmoothCubicCurveParameters
-        |. separator
-        |= point
-        |. separator
-        |= point
-        |. separator
-        |> P.map Path.SmoothCubicCurveCommand
-
-
-quadraticCurveParameters : Parser Path.CommandType
-quadraticCurveParameters =
-    P.succeed QuadraticCurveParameters
-        |. separator
-        |= point
-        |. separator
-        |= point
-        |. separator
-        |> P.map Path.QuadraticCurveCommand
-
-
-smoothQuadraticCurveParameters : Parser Path.CommandType
-smoothQuadraticCurveParameters =
-    P.succeed BaseParameters
-        |. separator
-        |= point
-        |. separator
-        |> P.map Path.SmoothQuadraticCurveCommand
-
-
 arcSize : Parser Path.ArcSize
 arcSize =
     P.oneOf
@@ -295,216 +178,304 @@ arcRotation =
         ]
 
 
-arcParameters : Parser Path.CommandType
-arcParameters =
-    P.succeed ArcParameters
-        |. separator
-        |= point
-        |. separator
-        |= float
-        |. separator
-        |= arcSize
-        |. separator
-        |= arcRotation
-        |. separator
-        |= point
-        |. separator
-        |> P.map Path.ArcCommand
+
+{-
+
+   {-| Parse all CommandTypes
+   -}
+   moveParameters : Parser Path.CommandType
+   moveParameters =
+       P.succeed BaseParameters
+           |. separator
+           |= point
+           |. separator
+           |> P.map Path.MoveCommand
 
 
-{-| Parse a list of Tokens from a sequence string for a CloseCommand. A
-CloseCommand has no parameters, so any non-separator characters other than the
-Command character are invalid.
+   lineParameters : Parser Path.CommandType
+   lineParameters =
+       P.succeed BaseParameters
+           |. separator
+           |= point
+           |. separator
+           |> P.map Path.LineCommand
+
+
+   horizontalLineParameters : Parser Path.CommandType
+   horizontalLineParameters =
+       P.succeed HorizontalLineParameters
+           |. separator
+           |= float
+           |. separator
+           |> P.map Path.HorizontalLineCommand
+
+
+   verticalLineParameters : Parser Path.CommandType
+   verticalLineParameters =
+       P.succeed VerticalLineParameters
+           |. separator
+           |= float
+           |. separator
+           |> P.map Path.VerticalLineCommand
+
+
+   cubicCurveParameters : Parser Path.CommandType
+   cubicCurveParameters =
+       P.succeed CubicCurveParameters
+           |. separator
+           |= point
+           |. separator
+           |= point
+           |. separator
+           |= point
+           |. separator
+           |> P.map Path.CubicCurveCommand
+
+
+   smoothCubicCurveParameters : Parser Path.CommandType
+   smoothCubicCurveParameters =
+       P.succeed SmoothCubicCurveParameters
+           |. separator
+           |= point
+           |. separator
+           |= point
+           |. separator
+           |> P.map Path.SmoothCubicCurveCommand
+
+
+   quadraticCurveParameters : Parser Path.CommandType
+   quadraticCurveParameters =
+       P.succeed QuadraticCurveParameters
+           |. separator
+           |= point
+           |. separator
+           |= point
+           |. separator
+           |> P.map Path.QuadraticCurveCommand
+
+
+   smoothQuadraticCurveParameters : Parser Path.CommandType
+   smoothQuadraticCurveParameters =
+       P.succeed BaseParameters
+           |. separator
+           |= point
+           |. separator
+           |> P.map Path.SmoothQuadraticCurveCommand
+
+
+   arcParameters : Parser Path.CommandType
+   arcParameters =
+       P.succeed ArcParameters
+           |. separator
+           |= point
+           |. separator
+           |= float
+           |. separator
+           |= arcSize
+           |. separator
+           |= arcRotation
+           |. separator
+           |= point
+           |. separator
+           |> P.map Path.ArcCommand
+
+
+   {-| Parse a list of Tokens from a sequence string for a CloseCommand. A
+   CloseCommand has no parameters, so any non-separator characters other than the
+   Command character are invalid.
+   -}
+   parseCloseCommand : String -> List Token
+   parseCloseCommand closeString =
+       let
+           closeCommand : Parser Token
+           closeCommand =
+               chompOne
+                   |> P.getChompedString
+                   |> P.map relationFromString
+                   |> P.map (\relation -> Command relation Path.CloseCommand)
+                   |> P.map (\command -> Valid command "")
+
+           closeSequence : Parser (List Token)
+           closeSequence =
+               P.oneOf
+                   [ P.map List.singleton closeCommand
+                       |. P.end
+                   , P.succeed Tuple.pair
+                       |= closeCommand
+                       |= invalidToken
+                       |> P.map (\( close, invalid ) -> [ close, invalid ])
+                   ]
+       in
+       case P.run closeSequence closeString of
+           Ok tokens ->
+               tokens
+
+           Err deadEnds ->
+               [ Error deadEnds ]
+
+
+   {-| Parse an Invalid Token from a string.
+   -}
+   parseInvalid : String -> List Token
+   parseInvalid invalidString =
+       case P.run (P.map List.singleton invalidToken) invalidString of
+           Ok tokens ->
+               tokens
+
+           Err deadEnds ->
+               [ Error deadEnds ]
+
+
+   {-| Parse a list of Tokens from a sequence string.
+   -}
+   parseSequence : String -> Parser Path.CommandType -> List Token
+   parseSequence sequenceString commandParameters =
+       let
+           step : Path.Relation -> SimpleLoopStep (List Token)
+           step relation reverseCommands =
+               P.oneOf
+                   [ P.succeed (\command -> P.Loop (command :: reverseCommands))
+                       |= (commandParameters
+                               |> P.mapChompedString (validToken relation)
+                          )
+                   , P.succeed ()
+                       |> P.map (\_ -> P.Done (List.reverse reverseCommands))
+                   ]
+
+           validToken : Path.Relation -> String -> Path.CommandType -> Token
+           validToken relation string commandType =
+               Valid (Command relation commandType) string
+
+           validSequenceFromRelation : Path.Relation -> Parser (List Token)
+           validSequenceFromRelation relation =
+               P.succeed Tuple.pair
+                   |= (commandParameters
+                           |> P.mapChompedString (validToken relation)
+                      )
+                   |= P.loop [] (step relation)
+                   |> P.map (\( first, rest ) -> first :: rest)
+
+           validSequence : Parser (List Token)
+           validSequence =
+               chompOne
+                   |> P.getChompedString
+                   |> P.map relationFromString
+                   |> P.andThen validSequenceFromRelation
+
+           trailingInvalid : Parser (List Token)
+           trailingInvalid =
+               P.succeed Tuple.pair
+                   |= validSequence
+                   |= invalidToken
+                   |> P.map (\( tokens, invalid ) -> tokens ++ [ invalid ])
+
+           sequence : Parser (List Token)
+           sequence =
+               P.oneOf
+                   [ P.backtrackable validSequence
+                   , P.backtrackable trailingInvalid
+                   , P.map List.singleton invalidToken
+                   ]
+       in
+       case P.run sequence sequenceString of
+           Ok tokens ->
+               tokens
+
+           Err deadEnds ->
+               [ Error deadEnds ]
+
+
+   {-| Parse a sequence string into a list of Tokens. Sequences that do not begin
+   with a Command character will become a single Invalid Token containing the
+   whole sequence string. Sequences that do begin with a Command character will
+   be parsed one set of parameters at a time into individual Valid Tokens. If
+   parsing a set of parameters fails at any point, the rest of the sequence will
+   become a single Invalid Token. Empty strings result in an empty list.
+   -}
+   tokensFromSequenceString : String -> List Token
+   tokensFromSequenceString sequenceString =
+       let
+           commandLetter : String
+           commandLetter =
+               String.toUpper (String.left 1 sequenceString)
+       in
+       case commandLetter of
+           "M" ->
+               parseSequence sequenceString moveParameters
+
+           "L" ->
+               parseSequence sequenceString lineParameters
+
+           "H" ->
+               parseSequence sequenceString horizontalLineParameters
+
+           "V" ->
+               parseSequence sequenceString verticalLineParameters
+
+           "C" ->
+               parseSequence sequenceString cubicCurveParameters
+
+           "S" ->
+               parseSequence sequenceString smoothCubicCurveParameters
+
+           "Q" ->
+               parseSequence sequenceString quadraticCurveParameters
+
+           "T" ->
+               parseSequence sequenceString smoothQuadraticCurveParameters
+
+           "A" ->
+               parseSequence sequenceString arcParameters
+
+           "Z" ->
+               parseCloseCommand sequenceString
+
+           _ ->
+               parseInvalid sequenceString
+
+
+   {-| Filter through a list of Tokens and return a list of tuples of Commands and
+   strings from the valid Tokens.
+   -}
+   commandsAndStringsFromValidTokens : List Token -> List ( Command, String )
+   commandsAndStringsFromValidTokens tokens =
+       let
+           step : Token -> List ( Command, String ) -> List ( Command, String )
+           step token commandsWithStrings =
+               case token of
+                   Valid command string ->
+                       ( command, string ) :: commandsWithStrings
+
+                   Invalid _ ->
+                       commandsWithStrings
+
+                   Error _ ->
+                       commandsWithStrings
+       in
+       List.reverse (List.foldl step [] tokens)
+
+
+   {-| Parse a Path from a Command string.
+   -}
+   parseCommandString : String -> Path
+   parseCommandString commandString =
+       splitCommandString commandString
+           |> List.concatMap tokensFromSequenceString
+           |> commandsAndStringsFromValidTokens
+           |> Path.buildComponents
+           |> Path.fromComponents
+
+
+
+   --------------------
+   -- TEST FUNCTIONS --
+   --  TODO: REMOVE  --
+   --------------------
+
+
+   testTokens : String -> List Token
+   testTokens string =
+       splitCommandString string
+           |> List.concatMap tokensFromSequenceString
+
 -}
-parseCloseCommand : String -> List Token
-parseCloseCommand closeString =
-    let
-        closeCommand : Parser Token
-        closeCommand =
-            chompOne
-                |> P.getChompedString
-                |> P.map relationFromString
-                |> P.map (\relation -> Command relation Path.CloseCommand)
-                |> P.map (\command -> Valid command "")
-
-        closeSequence : Parser (List Token)
-        closeSequence =
-            P.oneOf
-                [ P.map List.singleton closeCommand
-                    |. P.end
-                , P.succeed Tuple.pair
-                    |= closeCommand
-                    |= invalidToken
-                    |> P.map (\( close, invalid ) -> [ close, invalid ])
-                ]
-    in
-    case P.run closeSequence closeString of
-        Ok tokens ->
-            tokens
-
-        Err deadEnds ->
-            [ Error deadEnds ]
-
-
-{-| Parse an Invalid Token from a string.
--}
-parseInvalid : String -> List Token
-parseInvalid invalidString =
-    case P.run (P.map List.singleton invalidToken) invalidString of
-        Ok tokens ->
-            tokens
-
-        Err deadEnds ->
-            [ Error deadEnds ]
-
-
-{-| Parse a list of Tokens from a sequence string.
--}
-parseSequence : String -> Parser Path.CommandType -> List Token
-parseSequence sequenceString commandParameters =
-    let
-        step : SimpleLoopStep (List Path.CommandType)
-        step reverseCommands =
-            P.oneOf
-                [ P.succeed (\command -> P.Loop (command :: reverseCommands))
-                    |= commandParameters
-                , P.succeed ()
-                    |> P.map (\_ -> P.Done (List.reverse reverseCommands))
-                ]
-
-        validTokens : Path.Relation -> List Path.CommandType -> List Token
-        validTokens relation commandTypes =
-            List.map
-                (\commandType -> Valid (Command relation commandType) "")
-                commandTypes
-
-        validSequenceFromRelation : Path.Relation -> Parser (List Token)
-        validSequenceFromRelation relation =
-            P.succeed Tuple.pair
-                |= commandParameters
-                |= P.loop [] step
-                |> P.map (\( first, rest ) -> first :: rest)
-                |> P.map (validTokens relation)
-
-        validSequence : Parser (List Token)
-        validSequence =
-            chompOne
-                |> P.getChompedString
-                |> P.map relationFromString
-                |> P.andThen validSequenceFromRelation
-
-        trailingInvalid : Parser (List Token)
-        trailingInvalid =
-            P.succeed Tuple.pair
-                |= validSequence
-                |= invalidToken
-                |> P.map (\( tokens, invalid ) -> tokens ++ [ invalid ])
-
-        sequence : Parser (List Token)
-        sequence =
-            P.oneOf
-                [ P.backtrackable validSequence
-                , P.backtrackable trailingInvalid
-                , P.map List.singleton invalidToken
-                ]
-    in
-    case P.run sequence sequenceString of
-        Ok tokens ->
-            tokens
-
-        Err deadEnds ->
-            [ Error deadEnds ]
-
-
-{-| Parse a sequence string into a list of Tokens. Sequences that do not begin
-with a Command character will become a single Invalid Token containing the
-whole sequence string. Sequences that do begin with a Command character will
-be parsed one set of parameters at a time into individual Valid Tokens. If
-parsing a set of parameters fails at any point, the rest of the sequence will
-become a single Invalid Token. Empty strings result in an empty list.
--}
-tokensFromSequenceString : String -> List Token
-tokensFromSequenceString sequenceString =
-    let
-        commandLetter : String
-        commandLetter =
-            String.toUpper (String.left 1 sequenceString)
-    in
-    case commandLetter of
-        "M" ->
-            parseSequence sequenceString moveParameters
-
-        "L" ->
-            parseSequence sequenceString lineParameters
-
-        "H" ->
-            parseSequence sequenceString horizontalLineParameters
-
-        "V" ->
-            parseSequence sequenceString verticalLineParameters
-
-        "C" ->
-            parseSequence sequenceString cubicCurveParameters
-
-        "S" ->
-            parseSequence sequenceString smoothCubicCurveParameters
-
-        "Q" ->
-            parseSequence sequenceString quadraticCurveParameters
-
-        "T" ->
-            parseSequence sequenceString smoothQuadraticCurveParameters
-
-        "A" ->
-            parseSequence sequenceString arcParameters
-
-        "Z" ->
-            parseCloseCommand sequenceString
-
-        _ ->
-            parseInvalid sequenceString
-
-
-{-| Filter through a list of Tokens and return a list of tuples of Commands and
-strings from the valid Tokens.
--}
-commandsAndStringsFromValidTokens : List Token -> List ( Command, String )
-commandsAndStringsFromValidTokens tokens =
-    let
-        step : Token -> List ( Command, String ) -> List ( Command, String )
-        step token commandsWithStrings =
-            case token of
-                Valid command string ->
-                    ( command, string ) :: commandsWithStrings
-
-                Invalid _ ->
-                    commandsWithStrings
-
-                Error _ ->
-                    commandsWithStrings
-    in
-    List.reverse (List.foldl step [] tokens)
-
-
-{-| Parse a Path from a Command string.
--}
-parseCommandString : String -> Path
-parseCommandString commandString =
-    splitCommandString commandString
-        |> List.concatMap tokensFromSequenceString
-        |> commandsAndStringsFromValidTokens
-        |> Path.buildComponents
-        |> Path.fromComponents
-
-
-
---------------------
--- TEST FUNCTIONS --
---  TODO: REMOVE  --
---------------------
-
-
-testTokens : String -> List Token
-testTokens string =
-    splitCommandString string
-        |> List.concatMap tokensFromSequenceString

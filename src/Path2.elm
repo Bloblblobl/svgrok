@@ -30,26 +30,128 @@ type ArcRotation
     | CounterClockwise
 
 
-{-| The type (what kind of Segment it will draw) and relevant paramters of a
-Command.
+{-| The separator between 2 arbitrary semantic tokens in a Command string.
+-}
+type Separator
+    = NoSpace
+    | Spaces Int
+    | Comma { spacesBefore : Int, spacesAfter : Int }
+
+
+{-| Separators for an X-Y coordinate pair.
+-}
+type alias CoordinateSeparator =
+    { x : Separator, y : Separator }
+
+
+
+------------------------
+-- COMMAND PARAMETERS --
+------------------------
+
+
+type alias BaseParameters =
+    -- For Move, Line, and SmoothQuadraticCurve CommandTypes
+    { to : Point }
+
+
+type alias HorizontalLineParameters =
+    { toX : Float }
+
+
+type alias VerticalLineParameters =
+    { toY : Float }
+
+
+type alias CubicCurveParameters =
+    { startControl : Point, endControl : Point, to : Point }
+
+
+type alias SmoothCubicCurveParameters =
+    { endControl : Point, to : Point }
+
+
+type alias QuadraticCurveParameters =
+    { control : Point, to : Point }
+
+
+type alias ArcParameters =
+    { radii : Point
+    , angle : Float
+    , size : ArcSize
+    , rotation : ArcRotation
+    , to : Point
+    }
+
+
+
+---------------------
+-- COMMAND FORMATS --
+---------------------
+
+
+type alias BaseFormat =
+    -- For Move, Line, and SmoothQuadraticCurve CommandTypes
+    { afterLetter : Separator, afterTo : CoordinateSeparator }
+
+
+type alias HorizontalLineFormat =
+    { afterLetter : Separator, afterToX : Separator }
+
+
+type alias VerticalLineFormat =
+    { afterLetter : Separator, afterToY : Separator }
+
+
+type alias CubicCurveFormat =
+    { afterLetter : Separator
+    , afterStartControl : CoordinateSeparator
+    , afterEndControl : CoordinateSeparator
+    , afterTo : CoordinateSeparator
+    }
+
+
+type alias SmoothCubicCurveFormat =
+    { afterLetter : Separator
+    , afterEndControl : CoordinateSeparator
+    , afterTo : CoordinateSeparator
+    }
+
+
+type alias QuadratricCurveFormat =
+    { afterLetter : Separator
+    , afterControl : CoordinateSeparator
+    , afterTo : CoordinateSeparator
+    }
+
+
+type alias ArcFormat =
+    { afterLetter : Separator
+    , afterRadii : CoordinateSeparator
+    , afterAngle : Separator
+    , afterSize : Separator
+    , afterRotation : Separator
+    , afterTo : CoordinateSeparator
+    }
+
+
+type alias CloseFormat =
+    { afterLetter : Separator }
+
+
+{-| The type of a Command, describing its relevant parameters and format.
 -}
 type CommandType
-    = MoveCommand { to : Point }
-    | LineCommand { to : Point }
-    | HorizontalLineCommand { toX : Float }
-    | VerticalLineCommand { toY : Float }
-    | CubicCurveCommand { startControl : Point, endControl : Point, to : Point }
-    | SmoothCubicCurveCommand { endControl : Point, to : Point }
-    | QuadraticCurveCommand { control : Point, to : Point }
-    | SmoothQuadraticCurveCommand { to : Point }
-    | ArcCommand
-        { radii : Point
-        , angle : Float
-        , size : ArcSize
-        , rotation : ArcRotation
-        , to : Point
-        }
-    | CloseCommand
+    = MoveCommand BaseParameters BaseFormat
+    | LineCommand BaseParameters BaseFormat
+    | HorizontalLineCommand HorizontalLineParameters HorizontalLineFormat
+    | VerticalLineCommand VerticalLineParameters VerticalLineFormat
+    | CubicCurveCommand CubicCurveParameters CubicCurveFormat
+    | SmoothCubicCurveCommand SmoothCubicCurveParameters SmoothCubicCurveFormat
+    | QuadraticCurveCommand QuadraticCurveParameters QuadratricCurveFormat
+    | SmoothQuadraticCurveCommand BaseParameters BaseFormat
+    | ArcCommand ArcParameters ArcFormat
+    | CloseCommand CloseFormat
 
 
 {-| An instruction that defines the next Segment of the Path to be drawn.
@@ -158,11 +260,11 @@ points of smooth curve Commands into their absolute values.
 absolutePreviousControl : Segment -> Command -> Point -> Point
 absolutePreviousControl previousSegment command defaultPoint =
     case ( previousSegment, command.commandType ) of
-        ( CubicCurveSegment { endControl }, SmoothCubicCurveCommand _ ) ->
-            endControl
+        ( CubicCurveSegment params, SmoothCubicCurveCommand _ _ ) ->
+            params.endControl
 
-        ( QuadraticCurveSegment { control }, SmoothQuadraticCurveCommand _ ) ->
-            control
+        ( QuadraticCurveSegment params, SmoothQuadraticCurveCommand _ _ ) ->
+            params.control
 
         _ ->
             defaultPoint
@@ -200,13 +302,13 @@ buildComponent ( command, string ) componentBuilder =
         newSegment : Segment
         newSegment =
             case commandType of
-                MoveCommand { to } ->
+                MoveCommand { to } _ ->
                     MoveSegment { from = currentPoint, to = absolute to }
 
-                LineCommand { to } ->
+                LineCommand { to } _ ->
                     LineSegment { from = currentPoint, to = absolute to }
 
-                HorizontalLineCommand { toX } ->
+                HorizontalLineCommand { toX } _ ->
                     case relation of
                         Absolute ->
                             LineSegment
@@ -223,7 +325,7 @@ buildComponent ( command, string ) componentBuilder =
                                     }
                                 }
 
-                VerticalLineCommand { toY } ->
+                VerticalLineCommand { toY } _ ->
                     case relation of
                         Absolute ->
                             LineSegment
@@ -240,7 +342,7 @@ buildComponent ( command, string ) componentBuilder =
                                     }
                                 }
 
-                CubicCurveCommand { startControl, endControl, to } ->
+                CubicCurveCommand { startControl, endControl, to } _ ->
                     CubicCurveSegment
                         { startControl = absolute startControl
                         , endControl = absolute endControl
@@ -248,7 +350,7 @@ buildComponent ( command, string ) componentBuilder =
                         , to = absolute to
                         }
 
-                SmoothCubicCurveCommand { endControl, to } ->
+                SmoothCubicCurveCommand { endControl, to } _ ->
                     CubicCurveSegment
                         { startControl = previousControl
                         , endControl = absolute endControl
@@ -256,21 +358,21 @@ buildComponent ( command, string ) componentBuilder =
                         , to = absolute to
                         }
 
-                QuadraticCurveCommand { control, to } ->
+                QuadraticCurveCommand { control, to } _ ->
                     QuadraticCurveSegment
                         { control = absolute control
                         , from = currentPoint
                         , to = absolute to
                         }
 
-                SmoothQuadraticCurveCommand { to } ->
+                SmoothQuadraticCurveCommand { to } _ ->
                     QuadraticCurveSegment
                         { control = previousControl
                         , from = currentPoint
                         , to = absolute to
                         }
 
-                ArcCommand { radii, angle, size, rotation, to } ->
+                ArcCommand { radii, angle, size, rotation, to } _ ->
                     ArcSegment
                         { radii = radii
                         , angle = angle
@@ -280,7 +382,7 @@ buildComponent ( command, string ) componentBuilder =
                         , to = absolute to
                         }
 
-                CloseCommand ->
+                CloseCommand _ ->
                     CloseSegment
                         { from = currentPoint
                         , to = firstConnectedPoint
