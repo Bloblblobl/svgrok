@@ -30,15 +30,18 @@ type ArcRotation
     | CounterClockwise
 
 
-{-| The separator between 2 arbitrary semantic tokens in a Command string.
+{-| The Separator between 2 arbitrary semantic tokens in a Command string.
+NoLetter is a special variant that indicates that the Command was parsed as a
+subsequent set of parameters.
 -}
 type Separator
     = NoSpace
     | Spaces Int
     | Comma { spacesBefore : Int, spacesAfter : Int }
+    | NoLetter
 
 
-{-| Separators for an X-Y coordinate pair.
+{-| Grouped Separators for an X-Y coordinate pair.
 -}
 type alias CoordinateSeparator =
     { x : Separator, y : Separator }
@@ -193,7 +196,6 @@ Command into a single structure.
 type alias Component =
     { command : Command
     , segment : Segment
-    , string : String
     }
 
 
@@ -272,8 +274,8 @@ absolutePreviousControl previousSegment command defaultPoint =
 
 {-| Build a Component from a tuple of Command and String and a ComponentBuilder.
 -}
-buildComponent : ( Command, String ) -> ComponentBuilder -> ComponentBuilder
-buildComponent ( command, string ) componentBuilder =
+buildComponent : Command -> ComponentBuilder -> ComponentBuilder
+buildComponent command componentBuilder =
     let
         { relation, commandType } =
             command
@@ -392,7 +394,6 @@ buildComponent ( command, string ) componentBuilder =
         newComponent =
             { command = command
             , segment = newSegment
-            , string = string
             }
 
         nextCurrentPoint : Point
@@ -433,7 +434,7 @@ buildComponent ( command, string ) componentBuilder =
 
 {-| Build a list of Components from a list of Commands and Strings.
 -}
-buildComponents : List ( Command, String ) -> List Component
+buildComponents : List Command -> List Component
 buildComponents commandsAndStrings =
     List.foldl buildComponent initComponentBuilder commandsAndStrings
         |> .components
