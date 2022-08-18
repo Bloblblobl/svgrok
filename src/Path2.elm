@@ -35,8 +35,7 @@ NoLetter is a special variant that indicates that the Command was parsed as a
 subsequent set of parameters.
 -}
 type Separator
-    = NoSpace
-    | Spaces Int
+    = Spaces Int
     | Comma { spacesBefore : Int, spacesAfter : Int }
     | NoLetter
 

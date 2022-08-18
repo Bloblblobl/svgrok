@@ -135,13 +135,23 @@ parameterizedCommandLetters builder =
 
 {-| Parser for a Separator. If the Builder has already parsedOne set of
 parameters for the current State and its parsing the first Separator after the
-Command letter, it will parse no characters as NoLetter. Otherwise, it will
-parse no characters as NoSpace.
+Command letter, it will parse no characters as NoLetter.
 -}
 separator : Bool -> Parser Path.Separator
 separator parsedOne =
     P.oneOf
         [ P.succeed
+            (\before after ->
+                if after - before == 0 && parsedOne then
+                    Path.NoLetter
+
+                else
+                    Path.Spaces (after - before)
+            )
+            |= P.getOffset
+            |. P.spaces
+            |= P.getOffset
+        , P.succeed
             (\before1 after1 before2 after2 ->
                 Path.Comma
                     { spacesBefore = after1 - before1
@@ -155,17 +165,6 @@ separator parsedOne =
             |= P.getOffset
             |. P.spaces
             |= P.getOffset
-        , P.succeed (\before after -> Path.Spaces (after - before))
-            |= P.getOffset
-            |. P.spaces
-            |= P.getOffset
-        , P.succeed
-            (if parsedOne then
-                Path.NoLetter
-
-             else
-                Path.NoSpace
-            )
         ]
 
 
