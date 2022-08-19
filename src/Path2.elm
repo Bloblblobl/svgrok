@@ -431,6 +431,26 @@ buildComponent command componentBuilder =
     }
 
 
+arcSizeToString : ArcSize -> String
+arcSizeToString size =
+    case size of
+        Large ->
+            "1"
+
+        Small ->
+            "0"
+
+
+arcRotationToString : ArcRotation -> String
+arcRotationToString rotation =
+    case rotation of
+        Clockwise ->
+            "1"
+
+        CounterClockwise ->
+            "0"
+
+
 {-| Build a list of Components from a list of Commands and Strings.
 -}
 buildComponents : List Command -> List Component
@@ -506,19 +526,70 @@ commandToString { relation, commandType } =
                 ]
 
         CubicCurveCommand parameters format ->
-            ""
+            let
+                { startControl, endControl, to } =
+                    parameters
+
+                { afterLetter, afterStartControl, afterEndControl, afterTo } =
+                    format
+            in
+            String.concat
+                [ letter afterLetter "C"
+                , pointToString startControl afterStartControl
+                , pointToString endControl afterEndControl
+                , pointToString to afterTo
+                ]
 
         SmoothCubicCurveCommand parameters format ->
-            ""
+            let
+                { endControl, to } =
+                    parameters
+
+                { afterLetter, afterEndControl, afterTo } =
+                    format
+            in
+            String.concat
+                [ letter afterLetter "S"
+                , pointToString endControl afterEndControl
+                , pointToString to afterTo
+                ]
 
         QuadraticCurveCommand parameters format ->
-            ""
+            let
+                { control, to } =
+                    parameters
+
+                { afterLetter, afterControl, afterTo } =
+                    format
+            in
+            String.concat
+                [ letter afterLetter "Q"
+                , pointToString control afterControl
+                , pointToString to afterTo
+                ]
 
         SmoothQuadraticCurveCommand { to } { afterLetter, afterTo } ->
             letter afterLetter "T" ++ pointToString to afterTo
 
         ArcCommand parameters format ->
-            ""
+            let
+                { radii, angle, size, rotation, to } =
+                    parameters
+
+                { afterRadii, afterAngle, afterSize, afterRotation, afterTo } =
+                    format
+            in
+            String.concat
+                [ letter format.afterLetter "A"
+                , pointToString radii afterRadii
+                , String.fromFloat angle
+                , separatorToString afterAngle
+                , arcSizeToString size
+                , separatorToString afterSize
+                , arcRotationToString rotation
+                , separatorToString afterRotation
+                , pointToString to afterTo
+                ]
 
         CloseCommand { afterLetter } ->
             letter afterLetter "Z"
