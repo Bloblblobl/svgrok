@@ -40,9 +40,9 @@ type Separator
     | NoLetter
 
 
-{-| Grouped Separators for an X-Y coordinate pair.
+{-| Grouped Separators for a Point (that follow the respective X/Y value).
 -}
-type alias CoordinateSeparator =
+type alias PointSeparator =
     { x : Separator, y : Separator }
 
 
@@ -94,7 +94,7 @@ type alias ArcParameters =
 
 type alias BaseFormat =
     -- For Move, Line, and SmoothQuadraticCurve CommandTypes
-    { afterLetter : Separator, afterTo : CoordinateSeparator }
+    { afterLetter : Separator, afterTo : PointSeparator }
 
 
 type alias HorizontalLineFormat =
@@ -107,33 +107,33 @@ type alias VerticalLineFormat =
 
 type alias CubicCurveFormat =
     { afterLetter : Separator
-    , afterStartControl : CoordinateSeparator
-    , afterEndControl : CoordinateSeparator
-    , afterTo : CoordinateSeparator
+    , afterStartControl : PointSeparator
+    , afterEndControl : PointSeparator
+    , afterTo : PointSeparator
     }
 
 
 type alias SmoothCubicCurveFormat =
     { afterLetter : Separator
-    , afterEndControl : CoordinateSeparator
-    , afterTo : CoordinateSeparator
+    , afterEndControl : PointSeparator
+    , afterTo : PointSeparator
     }
 
 
 type alias QuadratricCurveFormat =
     { afterLetter : Separator
-    , afterControl : CoordinateSeparator
-    , afterTo : CoordinateSeparator
+    , afterControl : PointSeparator
+    , afterTo : PointSeparator
     }
 
 
 type alias ArcFormat =
     { afterLetter : Separator
-    , afterRadii : CoordinateSeparator
+    , afterRadii : PointSeparator
     , afterAngle : Separator
     , afterSize : Separator
     , afterRotation : Separator
-    , afterTo : CoordinateSeparator
+    , afterTo : PointSeparator
     }
 
 
@@ -438,3 +438,61 @@ buildComponents commandsAndStrings =
     List.foldl buildComponent initComponentBuilder commandsAndStrings
         |> .components
         |> List.reverse
+
+
+separatorToString : Separator -> String
+separatorToString separator =
+    case separator of
+        Spaces count ->
+            String.repeat count " "
+
+        Comma { spacesBefore, spacesAfter } ->
+            String.concat
+                [ String.repeat spacesBefore " "
+                , ","
+                , String.repeat spacesAfter " "
+                ]
+
+        NoLetter ->
+            ""
+
+
+pointToString : Point -> PointSeparator -> String
+pointToString point separator =
+    String.concat
+        [ String.fromFloat point.x
+        , separatorToString separator.x
+        , String.fromFloat point.y
+        , separatorToString separator.y
+        ]
+
+
+commandToString : Command -> String
+commandToString { relation, commandType } =
+    let
+        letter : Separator -> String -> String
+        letter separator upper =
+            case separator of
+                NoLetter ->
+                    ""
+
+                _ ->
+                    case relation of
+                        Absolute ->
+                            upper ++ separatorToString separator
+
+                        Relative ->
+                            String.toLower upper ++ separatorToString separator
+    in
+    case commandType of
+        MoveCommand { to } { afterLetter, afterTo } ->
+            letter afterLetter "M" ++ pointToString to afterTo
+
+        LineCommand { to } { afterLetter, afterTo } ->
+            letter afterLetter "L" ++ pointToString to afterTo
+
+        CloseCommand { afterLetter } ->
+            letter afterLetter "Z"
+
+        _ ->
+            ""

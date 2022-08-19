@@ -68,8 +68,6 @@ type alias Builder =
     }
 
 
-{-| Initial Builder.
--}
 initBuilder : Builder
 initBuilder =
     { results = [], state = Chomping "" }
@@ -276,3 +274,15 @@ parseCommandString commandString =
 
         Err _ ->
             Path.fromComponents []
+
+
+{-| Parses a commandString into a list of Parser Results. (FOR TESTING)
+-}
+parseCommandStringResults : String -> List Result
+parseCommandStringResults commandString =
+    case P.run builderLoop commandString of
+        Ok { results } ->
+            results
+
+        Err _ ->
+            []
