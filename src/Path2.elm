@@ -491,8 +491,34 @@ commandToString { relation, commandType } =
         LineCommand { to } { afterLetter, afterTo } ->
             letter afterLetter "L" ++ pointToString to afterTo
 
+        HorizontalLineCommand { toX } { afterLetter, afterToX } ->
+            String.concat
+                [ letter afterLetter "H"
+                , String.fromFloat toX
+                , separatorToString afterToX
+                ]
+
+        VerticalLineCommand { toY } { afterLetter, afterToY } ->
+            String.concat
+                [ letter afterLetter "V"
+                , String.fromFloat toY
+                , separatorToString afterToY
+                ]
+
+        CubicCurveCommand parameters format ->
+            ""
+
+        SmoothCubicCurveCommand parameters format ->
+            ""
+
+        QuadraticCurveCommand parameters format ->
+            ""
+
+        SmoothQuadraticCurveCommand { to } { afterLetter, afterTo } ->
+            letter afterLetter "T" ++ pointToString to afterTo
+
+        ArcCommand parameters format ->
+            ""
+
         CloseCommand { afterLetter } ->
             letter afterLetter "Z"
-
-        _ ->
-            ""
