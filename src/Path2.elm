@@ -52,8 +52,9 @@ type alias PointSeparator =
 ------------------------
 
 
+{-| For Move, Line, and SmoothQuadraticCurve CommandTypes.
+-}
 type alias BaseParameters =
-    -- For Move, Line, and SmoothQuadraticCurve CommandTypes
     { to : Point }
 
 
@@ -92,8 +93,9 @@ type alias ArcParameters =
 ---------------------
 
 
+{-| For Move, Line, and SmoothQuadraticCurve CommandTypes.
+-}
 type alias BaseFormat =
-    -- For Move, Line, and SmoothQuadraticCurve CommandTypes
     { afterLetter : Separator, afterTo : PointSeparator }
 
 
@@ -166,7 +168,7 @@ type alias Command =
 
 {-| A Segment of a Path that includes the start and end Points of the Segment as
 well as the relevant parameters (for Segments like curves and arcs), all with
-absolute values. Always maps to a corresponding Command.
+absolute values. Always has a corresponding Command.
 -}
 type Segment
     = MoveSegment { from : Point, to : Point }
@@ -198,7 +200,7 @@ type alias Component =
     }
 
 
-{-| The smallest relevant division of a Component.
+{-| The smallest division of a Component that can be interacted with/modified.
 -}
 type Element
     = End
@@ -217,7 +219,7 @@ type alias Selection =
     }
 
 
-{-| A list of Components with some optional selections on the list.
+{-| A list of Components with contextual interaction information.
 -}
 type alias Path =
     { components : List Component
@@ -227,7 +229,9 @@ type alias Path =
 
 
 {-| The implicit state of a Path, used when building up a list of Components
-from Commands.
+from Commands. The firstConnectedPoint is the Point where the current sequence
+of consecutive Commands started, a.k.a. the target Point of the last Move
+Command.
 -}
 type alias ComponentBuilder =
     { components : List Component
@@ -431,6 +435,21 @@ buildComponent command componentBuilder =
     }
 
 
+{-| Build a list of Components from a list of Commands.
+-}
+buildComponents : List Command -> List Component
+buildComponents commands =
+    List.foldl buildComponent initComponentBuilder commands
+        |> .components
+        |> List.reverse
+
+
+
+-------------------------
+-- TO STRING FUNCTIONS --
+-------------------------
+
+
 arcSizeToString : ArcSize -> String
 arcSizeToString size =
     case size of
@@ -449,15 +468,6 @@ arcRotationToString rotation =
 
         CounterClockwise ->
             "0"
-
-
-{-| Build a list of Components from a list of Commands and Strings.
--}
-buildComponents : List Command -> List Component
-buildComponents commandsAndStrings =
-    List.foldl buildComponent initComponentBuilder commandsAndStrings
-        |> .components
-        |> List.reverse
 
 
 separatorToString : Separator -> String
