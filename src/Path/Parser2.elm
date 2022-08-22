@@ -5,6 +5,20 @@ import Path2 as Path exposing (Path)
 import Point exposing (Point)
 
 
+type alias FormattedFloat =
+    { value : Float
+    , afterValue : Path.Separator
+    }
+
+
+type alias FormattedPoint =
+    { x : Float
+    , afterX : Path.Separator
+    , y : Float
+    , afterY : Path.Separator
+    }
+
+
 {-| The result of parsing a substring of a Command string.
 -}
 type Result
@@ -44,9 +58,8 @@ type ParameterizedCommandType
     determined by the case of the Command letter that was parsed to enter this
     State (lowercase -> Relative, uppercase -> Absolute).
 
-  - In the ParsedClose State, the Builder only attempts to parse other
-    (non-Close) Command letters. If it fails to find one, it will enter the
-    Chomping State.
+  - In the ParsedClose State, the Builder only attempts to parse Command
+    letters. If it fails to find one, it will enter the Chomping State.
 
 -}
 type State
@@ -73,17 +86,14 @@ initBuilder =
     { results = [], state = Chomping "" }
 
 
-{-| Chomp a character and add it to the current chompedString.
--}
-chompOne : String -> Builder -> Parser Builder
-chompOne chompedString builder =
-    P.getChompedString (P.chompIf (\_ -> True))
-        |> P.map
-            (\chompedChar ->
-                { builder
-                    | state = Chomping (chompedString ++ chompedChar)
-                }
-            )
+getPoint : FormattedPoint -> Point
+getPoint { x, y } =
+    { x = x, y = y }
+
+
+getPointSeparator : FormattedPoint -> Path.PointSeparator
+getPointSeparator { afterX, afterY } =
+    { x = afterX, y = afterY }
 
 
 {-| A List of tuples mapping uppercase Command letters to State builder
@@ -113,39 +123,47 @@ commandLetterToStateBuilder =
     ]
 
 
-{-| Parser for parameterized Command letters (all Commands other than Close).
--}
-parameterizedCommandLetters : Builder -> Parser Builder
-parameterizedCommandLetters builder =
-    let
-        letterParser : ( String, Path.Relation -> State ) -> Parser Builder
-        letterParser ( letter, stateBuilder ) =
-            P.oneOf
-                [ P.succeed (stateBuilder Path.Absolute)
-                    |. P.token letter
-                , P.succeed (stateBuilder Path.Relative)
-                    |. P.token (String.toLower letter)
-                ]
-                |> P.map (\state -> { builder | state = state })
-    in
-    P.oneOf (List.map letterParser commandLetterToStateBuilder)
+
+-------------
+-- PARSERS --
+-------------
 
 
-{-| Parser for a Separator. If the Builder has already parsedOne set of
-parameters for the current State and its parsing the first Separator after the
-Command letter, it will parse no characters as NoLetter.
+{-| Chomp a character and add it to the current chompedString.
 -}
-separator : Bool -> Parser Path.Separator
-separator parsedOne =
+chompOne : String -> Builder -> Parser Builder
+chompOne chompedString builder =
+    P.getChompedString (P.chompIf (\_ -> True))
+        |> P.map
+            (\chompedChar ->
+                { builder | state = Chomping (chompedString ++ chompedChar) }
+            )
+
+
+float : Parser Float
+float =
+    P.oneOf
+        [ P.succeed negate
+            |. P.symbol "-"
+            |= P.float
+        , P.float
+        ]
+
+
+point : Parser FormattedPoint
+point =
+    P.succeed FormattedPoint
+        |= float
+        |= separator
+        |= float
+        |= separator
+
+
+separator : Parser Path.Separator
+separator =
     P.oneOf
         [ P.succeed
-            (\before after ->
-                if after - before == 0 && parsedOne then
-                    Path.NoLetter
-
-                else
-                    Path.Spaces (after - before)
-            )
+            (\before after -> Path.Spaces (after - before))
             |= P.getOffset
             |. P.spaces
             |= P.getOffset
@@ -166,8 +184,66 @@ separator parsedOne =
         ]
 
 
-{-| Parser for a Close Command, which consists of only the letter "Z"/"z" and a
-Separator.
+parameterizedCommandLetters : Builder -> Parser Builder
+parameterizedCommandLetters builder =
+    let
+        letterParser : ( String, Path.Relation -> State ) -> Parser Builder
+        letterParser ( letter, stateBuilder ) =
+            P.oneOf
+                [ P.succeed (stateBuilder Path.Absolute)
+                    |. P.token letter
+                , P.succeed (stateBuilder Path.Relative)
+                    |. P.token (String.toLower letter)
+                ]
+                |> P.map (\state -> { builder | state = state })
+    in
+    P.oneOf (List.map letterParser commandLetterToStateBuilder)
+
+
+moveCommand : Bool -> Parser Path.CommandType
+moveCommand parsedOne =
+    let
+        makeMove : Path.Separator -> FormattedPoint -> Path.CommandType
+        makeMove sep formattedTo =
+            Path.MoveCommand
+                { to = getPoint formattedTo }
+                { afterLetter = sep
+                , afterTo = getPointSeparator formattedTo
+                }
+    in
+    if parsedOne then
+        P.succeed (makeMove Path.NoLetter)
+            |= point
+
+    else
+        P.succeed makeMove
+            |= separator
+            |= point
+
+
+lineCommand : Bool -> Parser Path.CommandType
+lineCommand parsedOne =
+    let
+        makeLine : Path.Separator -> FormattedPoint -> Path.CommandType
+        makeLine sep formattedTo =
+            Path.LineCommand
+                { to = getPoint formattedTo }
+                { afterLetter = sep
+                , afterTo = getPointSeparator formattedTo
+                }
+    in
+    if parsedOne then
+        P.succeed (makeLine Path.NoLetter)
+            |= point
+
+    else
+        P.succeed makeLine
+            |= separator
+            |= point
+
+
+{-| Special case parser for a Close Command, which consists of only the letter
+"Z"/"z" and a Separator.
 -}
 closeCommand : Builder -> Parser Builder
 closeCommand builder =
@@ -181,7 +257,7 @@ closeCommand builder =
                     , P.succeed Path.Relative
                         |. P.token "z"
                     ]
-                |= P.map Path.CloseFormat (separator False)
+                |= P.map Path.CloseFormat separator
 
         result : Parser Result
         result =
@@ -201,36 +277,116 @@ closeCommand builder =
             )
 
 
+{-| Add an Invalid Result to the Builder. Used when transitioning from the
+Chomping State to a different State to track the chomped String.
+-}
+addInvalidResult : Builder -> String -> Builder
+addInvalidResult builder invalidString =
+    case builder.results of
+        (Invalid existing) :: rest ->
+            { builder | results = Invalid (existing ++ invalidString) :: rest }
+
+        _ ->
+            if invalidString == "" then
+                builder
+
+            else
+                { builder | results = Invalid invalidString :: builder.results }
+
+
+{-| Adds a Valid Result to the Builder, meaning a parameterized Command was
+successfully parsed, and sets parsedOne to True.
+-}
+addValidResult : Builder -> Path.Relation -> Path.CommandType -> Builder
+addValidResult { results, state } relation commandType =
+    let
+        command : Path.Command
+        command =
+            { relation = relation, commandType = commandType }
+
+        newState : State
+        newState =
+            case state of
+                ParsingParameterizedCommandType stateParams ->
+                    ParsingParameterizedCommandType
+                        { stateParams | parsedOne = True }
+
+                _ ->
+                    -- Shouldn't reach this case, but need to account for it
+                    state
+    in
+    { results = Valid command :: results, state = newState }
+
+
 {-| Parser for a single step in the overall parse loop based on the Builder's
 State. It will either parse a Command letter or a set of Command parameters, or
 chomp a character.
 -}
 builderStep : Builder -> Parser Builder
 builderStep builder =
-    let
-        { results, state } =
-            builder
-    in
-    case state of
+    case builder.state of
         Chomping chompedString ->
+            let
+                builderWithResult : Builder
+                builderWithResult =
+                    addInvalidResult builder chompedString
+            in
             P.oneOf
-                [ closeCommand builder
+                [ parameterizedCommandLetters builder
+                , closeCommand builderWithResult
                 , chompOne chompedString builder
                 ]
 
         ParsingParameterizedCommandType { commandType, relation, parsedOne } ->
-            if parsedOne then
-                P.oneOf
-                    [ parameterizedCommandLetters builder
-                    , chompOne "" builder
-                    ]
+            let
+                letter : String -> String
+                letter uppercase =
+                    if parsedOne then
+                        ""
 
-            else
-                chompOne "" builder
+                    else
+                        case relation of
+                            Path.Absolute ->
+                                uppercase
+
+                            Path.Relative ->
+                                String.toLower uppercase
+
+                withAllBranches : String -> Parser Builder -> Parser Builder
+                withAllBranches uppercase commandTypeParser =
+                    List.concat
+                        [ [ commandTypeParser ]
+                        , if parsedOne then
+                            [ parameterizedCommandLetters builder
+                            , closeCommand builder
+                            ]
+
+                          else
+                            []
+                        , [ chompOne (letter uppercase) builder ]
+                        ]
+                        |> P.oneOf
+            in
+            case commandType of
+                Move ->
+                    P.succeed (addValidResult builder relation)
+                        |= P.backtrackable (moveCommand parsedOne)
+                        |> withAllBranches "M"
+
+                _ ->
+                    if parsedOne then
+                        P.oneOf
+                            [ parameterizedCommandLetters builder
+                            , chompOne (letter ".") builder
+                            ]
+
+                    else
+                        chompOne (letter ".") builder
 
         ParsedClose ->
             P.oneOf
                 [ parameterizedCommandLetters builder
+                , closeCommand builder
                 , chompOne "" builder
                 ]
 
@@ -250,10 +406,82 @@ builderLoop =
         )
 
 
-{-| Unwraps the Command in a Result if it's Valid.
+{-| Extracts any remaining Results from the Builder's final State.
 -}
-commandFromResult : Result -> Maybe Path.Command
-commandFromResult result =
+finishBuilder : Builder -> List Result
+finishBuilder { results, state } =
+    case state of
+        Chomping chompedString ->
+            case results of
+                (Invalid existing) :: rest ->
+                    Invalid (existing ++ chompedString) :: rest
+
+                _ ->
+                    Invalid chompedString :: results
+
+        ParsingParameterizedCommandType { commandType, relation, parsedOne } ->
+            let
+                letterCase : String -> String
+                letterCase =
+                    case relation of
+                        Path.Absolute ->
+                            identity
+
+                        Path.Relative ->
+                            String.toLower
+
+                letter : String
+                letter =
+                    case commandType of
+                        Move ->
+                            letterCase "M"
+
+                        Line ->
+                            letterCase "L"
+
+                        HorizontalLine ->
+                            letterCase "H"
+
+                        VerticalLine ->
+                            letterCase "V"
+
+                        CubicCurve ->
+                            letterCase "C"
+
+                        SmoothCubicCurve ->
+                            letterCase "S"
+
+                        QuadraticCurve ->
+                            letterCase "Q"
+
+                        SmoothQuadraticCurve ->
+                            letterCase "T"
+
+                        Arc ->
+                            letterCase "A"
+            in
+            if parsedOne then
+                results
+
+            else
+                Invalid letter :: results
+
+        ParsedClose ->
+            results
+
+
+resultToString : Result -> String
+resultToString result =
+    case result of
+        Valid command ->
+            "V|" ++ Path.commandToString command
+
+        Invalid invalidString ->
+            "I|" ++ invalidString
+
+
+resultToCommand : Result -> Maybe Path.Command
+resultToCommand result =
     case result of
         Valid command ->
             Just command
@@ -262,13 +490,13 @@ commandFromResult result =
             Nothing
 
 
-{-| Parses a commandString into a Path.
--}
-parseCommandString : String -> Path
-parseCommandString commandString =
+parse : String -> Path
+parse commandString =
     case P.run builderLoop commandString of
-        Ok { results } ->
-            List.filterMap commandFromResult results
+        Ok builder ->
+            finishBuilder builder
+                |> List.filterMap resultToCommand
+                |> List.reverse
                 |> Path.buildComponents
                 |> Path.fromComponents
 
@@ -276,13 +504,29 @@ parseCommandString commandString =
             Path.fromComponents []
 
 
-{-| Parses a commandString into a list of Parser Results. (FOR TESTING)
--}
-parseCommandStringResults : String -> List Result
-parseCommandStringResults commandString =
+
+-----------------
+-- FOR TESTING --
+-----------------
+
+
+parse2 : String -> List String
+parse2 commandString =
     case P.run builderLoop commandString of
-        Ok { results } ->
-            results
+        Ok builder ->
+            finishBuilder builder
+                |> List.map resultToString
+                |> List.reverse
+
+        Err deadEnds ->
+            [ P.deadEndsToString deadEnds ]
+
+
+quickParse : Parser a -> String -> Maybe a
+quickParse parser string =
+    case P.run parser string of
+        Ok result ->
+            Just result
 
         Err _ ->
-            []
+            Nothing
