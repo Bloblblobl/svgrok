@@ -1,28 +1,37 @@
 module Path.Parser2 exposing (..)
 
 import Parser as P exposing ((|.), (|=), Parser)
-import Path2 as Path exposing (Path)
+import Path2 as Path
+    exposing
+        ( CloseFormat
+        , Command
+        , CommandType(..)
+        , Path
+        , PointSeparator
+        , Relation(..)
+        , Separator(..)
+        )
 import Point exposing (Point)
 
 
 type alias FormattedFloat =
     { value : Float
-    , afterValue : Path.Separator
+    , afterValue : Separator
     }
 
 
 type alias FormattedPoint =
     { x : Float
-    , afterX : Path.Separator
+    , afterX : Separator
     , y : Float
-    , afterY : Path.Separator
+    , afterY : Separator
     }
 
 
 {-| The result of parsing a substring of a Command string.
 -}
 type Result
-    = Valid Path.Command
+    = Valid Command
     | Invalid String
 
 
@@ -66,7 +75,7 @@ type State
     = Chomping String
     | ParsingParameterizedCommandType
         { commandType : ParameterizedCommandType
-        , relation : Path.Relation
+        , relation : Relation
         , parsedOne : Bool
         }
     | ParsedClose
@@ -91,7 +100,7 @@ getPoint { x, y } =
     { x = x, y = y }
 
 
-getPointSeparator : FormattedPoint -> Path.PointSeparator
+getPointSeparator : FormattedPoint -> PointSeparator
 getPointSeparator { afterX, afterY } =
     { x = afterX, y = afterY }
 
@@ -100,10 +109,10 @@ getPointSeparator { afterX, afterY } =
 functions (which map a Relation to a State). Used by parameterizedCommandLetters
 to build up parsers for all parameterized Command letters.
 -}
-commandLetterToStateBuilder : List ( String, Path.Relation -> State )
+commandLetterToStateBuilder : List ( String, Relation -> State )
 commandLetterToStateBuilder =
     let
-        paramStateBuilder : ParameterizedCommandType -> Path.Relation -> State
+        paramStateBuilder : ParameterizedCommandType -> Relation -> State
         paramStateBuilder commandType relation =
             ParsingParameterizedCommandType
                 { commandType = commandType
@@ -150,8 +159,8 @@ float =
         ]
 
 
-point : Parser FormattedPoint
-point =
+formattedPoint : Parser FormattedPoint
+formattedPoint =
     P.succeed FormattedPoint
         |= float
         |= separator
@@ -159,17 +168,17 @@ point =
         |= separator
 
 
-separator : Parser Path.Separator
+separator : Parser Separator
 separator =
     P.oneOf
         [ P.succeed
-            (\before after -> Path.Spaces (after - before))
+            (\before after -> Spaces (after - before))
             |= P.getOffset
             |. P.spaces
             |= P.getOffset
         , P.succeed
             (\before1 after1 before2 after2 ->
-                Path.Comma
+                Comma
                     { spacesBefore = after1 - before1
                     , spacesAfter = after2 - before2
                     }
@@ -187,12 +196,12 @@ separator =
 parameterizedCommandLetters : Builder -> Parser Builder
 parameterizedCommandLetters builder =
     let
-        letterParser : ( String, Path.Relation -> State ) -> Parser Builder
+        letterParser : ( String, Relation -> State ) -> Parser Builder
         letterParser ( letter, stateBuilder ) =
             P.oneOf
-                [ P.succeed (stateBuilder Path.Absolute)
+                [ P.succeed (stateBuilder Absolute)
                     |. P.token letter
-                , P.succeed (stateBuilder Path.Relative)
+                , P.succeed (stateBuilder Relative)
                     |. P.token (String.toLower letter)
                 ]
                 |> P.map (\state -> { builder | state = state })
@@ -200,46 +209,52 @@ parameterizedCommandLetters builder =
     P.oneOf (List.map letterParser commandLetterToStateBuilder)
 
 
-moveCommand : Bool -> Parser Path.CommandType
+
+-- commandType : Bool -> (Separator -> Parser CommandType) -> Parser CommandType
+-- command parsedOne commandTypeParameters =
+--     if parsedOne then
+
+
+moveCommand : Bool -> Parser CommandType
 moveCommand parsedOne =
     let
-        makeMove : Path.Separator -> FormattedPoint -> Path.CommandType
+        makeMove : Separator -> FormattedPoint -> CommandType
         makeMove sep formattedTo =
-            Path.MoveCommand
+            MoveCommand
                 { to = getPoint formattedTo }
                 { afterLetter = sep
                 , afterTo = getPointSeparator formattedTo
                 }
     in
     if parsedOne then
-        P.succeed (makeMove Path.NoLetter)
-            |= point
+        P.succeed (makeMove NoLetter)
+            |= formattedPoint
 
     else
         P.succeed makeMove
             |= separator
-            |= point
+            |= formattedPoint
 
 
-lineCommand : Bool -> Parser Path.CommandType
+lineCommand : Bool -> Parser CommandType
 lineCommand parsedOne =
     let
-        makeLine : Path.Separator -> FormattedPoint -> Path.CommandType
+        makeLine : Separator -> FormattedPoint -> CommandType
         makeLine sep formattedTo =
-            Path.LineCommand
+            LineCommand
                 { to = getPoint formattedTo }
                 { afterLetter = sep
                 , afterTo = getPointSeparator formattedTo
                 }
     in
     if parsedOne then
-        P.succeed (makeLine Path.NoLetter)
-            |= point
+        P.succeed (makeLine NoLetter)
+            |= formattedPoint
 
     else
         P.succeed makeLine
             |= separator
-            |= point
+            |= formattedPoint
 
 
 {-| Special case parser for a Close Command, which consists of only the letter
@@ -248,16 +263,16 @@ lineCommand parsedOne =
 closeCommand : Builder -> Parser Builder
 closeCommand builder =
     let
-        relationFormat : Parser ( Path.Relation, Path.CloseFormat )
+        relationFormat : Parser ( Relation, CloseFormat )
         relationFormat =
             P.succeed Tuple.pair
                 |= P.oneOf
-                    [ P.succeed Path.Absolute
+                    [ P.succeed Absolute
                         |. P.token "Z"
-                    , P.succeed Path.Relative
+                    , P.succeed Relative
                         |. P.token "z"
                     ]
-                |= P.map Path.CloseFormat separator
+                |= P.map CloseFormat separator
 
         result : Parser Result
         result =
@@ -266,7 +281,7 @@ closeCommand builder =
                     (\( relation, format ) ->
                         Valid
                             { relation = relation
-                            , commandType = Path.CloseCommand format
+                            , commandType = CloseCommand format
                             }
                     )
     in
@@ -297,10 +312,10 @@ addInvalidResult builder invalidString =
 {-| Adds a Valid Result to the Builder, meaning a parameterized Command was
 successfully parsed, and sets parsedOne to True.
 -}
-addValidResult : Builder -> Path.Relation -> Path.CommandType -> Builder
+addValidResult : Builder -> Relation -> CommandType -> Builder
 addValidResult { results, state } relation commandType =
     let
-        command : Path.Command
+        command : Command
         command =
             { relation = relation, commandType = commandType }
 
@@ -318,6 +333,28 @@ addValidResult { results, state } relation commandType =
     { results = Valid command :: results, state = newState }
 
 
+{-| Adds all the possible branches for a specific parameterized CommandType
+Parser. If the Builder has already parsedOne of the CommandType's parameter
+sets, add the branches for other Command letters. Otherwise, just add the
+branch to revert to the chomping State for when it fails to parse a set of
+parameters.
+-}
+withAllBranches : Builder -> Bool -> String -> Parser Builder -> Parser Builder
+withAllBranches builder parsedOne letter commandTypeParser =
+    List.concat
+        [ [ commandTypeParser ]
+        , if parsedOne then
+            [ parameterizedCommandLetters builder
+            , closeCommand builder
+            ]
+
+          else
+            []
+        , [ chompOne letter builder ]
+        ]
+        |> P.oneOf
+
+
 {-| Parser for a single step in the overall parse loop based on the Builder's
 State. It will either parse a Command letter or a set of Command parameters, or
 chomp a character.
@@ -332,7 +369,7 @@ builderStep builder =
                     addInvalidResult builder chompedString
             in
             P.oneOf
-                [ parameterizedCommandLetters builder
+                [ parameterizedCommandLetters builderWithResult
                 , closeCommand builderWithResult
                 , chompOne chompedString builder
                 ]
@@ -346,32 +383,24 @@ builderStep builder =
 
                     else
                         case relation of
-                            Path.Absolute ->
+                            Absolute ->
                                 uppercase
 
-                            Path.Relative ->
+                            Relative ->
                                 String.toLower uppercase
 
-                withAllBranches : String -> Parser Builder -> Parser Builder
-                withAllBranches uppercase commandTypeParser =
-                    List.concat
-                        [ [ commandTypeParser ]
-                        , if parsedOne then
-                            [ parameterizedCommandLetters builder
-                            , closeCommand builder
-                            ]
-
-                          else
-                            []
-                        , [ chompOne (letter uppercase) builder ]
-                        ]
-                        |> P.oneOf
+                makeParser : Parser CommandType -> String -> Parser Builder
+                makeParser commandTypeParser uppercase =
+                    P.succeed (addValidResult builder relation)
+                        |= P.backtrackable commandTypeParser
+                        |> withAllBranches builder parsedOne (letter uppercase)
             in
             case commandType of
                 Move ->
-                    P.succeed (addValidResult builder relation)
-                        |= P.backtrackable (moveCommand parsedOne)
-                        |> withAllBranches "M"
+                    makeParser (moveCommand parsedOne) "M"
+
+                Line ->
+                    makeParser (lineCommand parsedOne) "L"
 
                 _ ->
                     if parsedOne then
@@ -412,22 +441,18 @@ finishBuilder : Builder -> List Result
 finishBuilder { results, state } =
     case state of
         Chomping chompedString ->
-            case results of
-                (Invalid existing) :: rest ->
-                    Invalid (existing ++ chompedString) :: rest
-
-                _ ->
-                    Invalid chompedString :: results
+            addInvalidResult { results = results, state = state } chompedString
+                |> .results
 
         ParsingParameterizedCommandType { commandType, relation, parsedOne } ->
             let
                 letterCase : String -> String
                 letterCase =
                     case relation of
-                        Path.Absolute ->
+                        Absolute ->
                             identity
 
-                        Path.Relative ->
+                        Relative ->
                             String.toLower
 
                 letter : String
@@ -464,7 +489,8 @@ finishBuilder { results, state } =
                 results
 
             else
-                Invalid letter :: results
+                addInvalidResult { results = results, state = state } letter
+                    |> .results
 
         ParsedClose ->
             results
@@ -480,7 +506,7 @@ resultToString result =
             "I|" ++ invalidString
 
 
-resultToCommand : Result -> Maybe Path.Command
+resultToCommand : Result -> Maybe Command
 resultToCommand result =
     case result of
         Valid command ->
