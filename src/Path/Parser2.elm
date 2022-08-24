@@ -3,7 +3,9 @@ module Path.Parser2 exposing (..)
 import Parser as P exposing ((|.), (|=), Parser)
 import Path2 as Path
     exposing
-        ( CloseFormat
+        ( ArcRotation(..)
+        , ArcSize(..)
+        , CloseFormat
         , Command
         , CommandType(..)
         , Path
@@ -12,20 +14,6 @@ import Path2 as Path
         , Separator(..)
         )
 import Point exposing (Point)
-
-
-type alias FormattedFloat =
-    { value : Float
-    , afterValue : Separator
-    }
-
-
-type alias FormattedPoint =
-    { x : Float
-    , afterX : Separator
-    , y : Float
-    , afterY : Separator
-    }
 
 
 {-| The result of parsing a substring of a Command string.
@@ -95,16 +83,6 @@ initBuilder =
     { results = [], state = Chomping "" }
 
 
-getPoint : FormattedPoint -> Point
-getPoint { x, y } =
-    { x = x, y = y }
-
-
-getPointSeparator : FormattedPoint -> PointSeparator
-getPointSeparator { afterX, afterY } =
-    { x = afterX, y = afterY }
-
-
 {-| A List of tuples mapping uppercase Command letters to State builder
 functions (which map a Relation to a State). Used by parameterizedCommandLetters
 to build up parsers for all parameterized Command letters.
@@ -138,6 +116,40 @@ commandLetterToStateBuilder =
 -------------
 
 
+type alias FormattedFloat =
+    { value : Float
+    , afterValue : Separator
+    }
+
+
+getFloat : FormattedFloat -> Float
+getFloat { value } =
+    value
+
+
+getFloatSeparator : FormattedFloat -> Separator
+getFloatSeparator { afterValue } =
+    afterValue
+
+
+type alias FormattedPoint =
+    { x : Float
+    , afterX : Separator
+    , y : Float
+    , afterY : Separator
+    }
+
+
+getPoint : FormattedPoint -> Point
+getPoint { x, y } =
+    { x = x, y = y }
+
+
+getPointSeparator : FormattedPoint -> PointSeparator
+getPointSeparator { afterX, afterY } =
+    { x = afterX, y = afterY }
+
+
 {-| Chomp a character and add it to the current chompedString.
 -}
 chompOne : String -> Builder -> Parser Builder
@@ -159,6 +171,13 @@ float =
         ]
 
 
+formattedFloat : Parser FormattedFloat
+formattedFloat =
+    P.succeed FormattedFloat
+        |= float
+        |= separator
+
+
 formattedPoint : Parser FormattedPoint
 formattedPoint =
     P.succeed FormattedPoint
@@ -171,22 +190,23 @@ formattedPoint =
 separator : Parser Separator
 separator =
     P.oneOf
-        [ P.succeed
-            (\before after -> Spaces (after - before))
-            |= P.getOffset
-            |. P.spaces
-            |= P.getOffset
+        [ P.backtrackable <|
+            P.succeed
+                (\before1 after1 before2 after2 ->
+                    Comma
+                        { spacesBefore = after1 - before1
+                        , spacesAfter = after2 - before2
+                        }
+                )
+                |= P.getOffset
+                |. P.spaces
+                |= P.getOffset
+                |. P.token ","
+                |= P.getOffset
+                |. P.spaces
+                |= P.getOffset
         , P.succeed
-            (\before1 after1 before2 after2 ->
-                Comma
-                    { spacesBefore = after1 - before1
-                    , spacesAfter = after2 - before2
-                    }
-            )
-            |= P.getOffset
-            |. P.spaces
-            |= P.getOffset
-            |. P.token ","
+            (\before after -> Spaces (after - before))
             |= P.getOffset
             |. P.spaces
             |= P.getOffset
@@ -207,12 +227,6 @@ parameterizedCommandLetters builder =
                 |> P.map (\state -> { builder | state = state })
     in
     P.oneOf (List.map letterParser commandLetterToStateBuilder)
-
-
-
--- commandType : Bool -> (Separator -> Parser CommandType) -> Parser CommandType
--- command parsedOne commandTypeParameters =
---     if parsedOne then
 
 
 moveCommand : Bool -> Parser CommandType
@@ -255,6 +269,301 @@ lineCommand parsedOne =
         P.succeed makeLine
             |= separator
             |= formattedPoint
+
+
+horizontalLineCommand : Bool -> Parser CommandType
+horizontalLineCommand parsedOne =
+    let
+        makeHorizontalLine : Separator -> FormattedFloat -> CommandType
+        makeHorizontalLine sep formattedToX =
+            HorizontalLineCommand
+                { toX = getFloat formattedToX }
+                { afterLetter = sep
+                , afterToX = getFloatSeparator formattedToX
+                }
+    in
+    if parsedOne then
+        P.succeed (makeHorizontalLine NoLetter)
+            |= formattedFloat
+
+    else
+        P.succeed makeHorizontalLine
+            |= separator
+            |= formattedFloat
+
+
+verticalLineCommand : Bool -> Parser CommandType
+verticalLineCommand parsedOne =
+    let
+        makeVerticalLine : Separator -> FormattedFloat -> CommandType
+        makeVerticalLine sep formattedToY =
+            VerticalLineCommand
+                { toY = getFloat formattedToY }
+                { afterLetter = sep
+                , afterToY = getFloatSeparator formattedToY
+                }
+    in
+    if parsedOne then
+        P.succeed (makeVerticalLine NoLetter)
+            |= formattedFloat
+
+    else
+        P.succeed makeVerticalLine
+            |= separator
+            |= formattedFloat
+
+
+type alias FormattedCubicCurve =
+    { startControl : FormattedPoint
+    , endControl : FormattedPoint
+    , to : FormattedPoint
+    }
+
+
+type alias MakeCubicCurve =
+    Separator -> FormattedCubicCurve -> CommandType
+
+
+cubicCurveCommand : Bool -> Parser CommandType
+cubicCurveCommand parsedOne =
+    let
+        makeCubicCurve : MakeCubicCurve
+        makeCubicCurve sep { startControl, endControl, to } =
+            CubicCurveCommand
+                { startControl = getPoint startControl
+                , endControl = getPoint endControl
+                , to = getPoint to
+                }
+                { afterLetter = sep
+                , afterStartControl = getPointSeparator startControl
+                , afterEndControl = getPointSeparator endControl
+                , afterTo = getPointSeparator to
+                }
+
+        formattedCubicCurve : Parser FormattedCubicCurve
+        formattedCubicCurve =
+            P.succeed FormattedCubicCurve
+                |= formattedPoint
+                |= formattedPoint
+                |= formattedPoint
+    in
+    if parsedOne then
+        P.succeed (makeCubicCurve NoLetter)
+            |= formattedCubicCurve
+
+    else
+        P.succeed makeCubicCurve
+            |= separator
+            |= formattedCubicCurve
+
+
+type alias FormattedSmoothCubicCurve =
+    { endControl : FormattedPoint
+    , to : FormattedPoint
+    }
+
+
+type alias MakeSmoothCubicCurve =
+    Separator -> FormattedSmoothCubicCurve -> CommandType
+
+
+smoothCubicCurveCommand : Bool -> Parser CommandType
+smoothCubicCurveCommand parsedOne =
+    let
+        makeSmoothCubicCurve : MakeSmoothCubicCurve
+        makeSmoothCubicCurve sep { endControl, to } =
+            SmoothCubicCurveCommand
+                { endControl = getPoint endControl
+                , to = getPoint to
+                }
+                { afterLetter = sep
+                , afterEndControl = getPointSeparator endControl
+                , afterTo = getPointSeparator to
+                }
+
+        formattedSmoothCubicCurve : Parser FormattedSmoothCubicCurve
+        formattedSmoothCubicCurve =
+            P.succeed FormattedSmoothCubicCurve
+                |= formattedPoint
+                |= formattedPoint
+    in
+    if parsedOne then
+        P.succeed (makeSmoothCubicCurve NoLetter)
+            |= formattedSmoothCubicCurve
+
+    else
+        P.succeed makeSmoothCubicCurve
+            |= separator
+            |= formattedSmoothCubicCurve
+
+
+type alias FormattedQuadraticCurve =
+    { control : FormattedPoint
+    , to : FormattedPoint
+    }
+
+
+type alias MakeQuadraticCurve =
+    Separator -> FormattedQuadraticCurve -> CommandType
+
+
+quadraticCurveCommand : Bool -> Parser CommandType
+quadraticCurveCommand parsedOne =
+    let
+        makeQuadraticCurve : MakeQuadraticCurve
+        makeQuadraticCurve sep { control, to } =
+            QuadraticCurveCommand
+                { control = getPoint control
+                , to = getPoint to
+                }
+                { afterLetter = sep
+                , afterControl = getPointSeparator control
+                , afterTo = getPointSeparator to
+                }
+
+        formattedQuadraticCurve : Parser FormattedQuadraticCurve
+        formattedQuadraticCurve =
+            P.succeed FormattedQuadraticCurve
+                |= formattedPoint
+                |= formattedPoint
+    in
+    if parsedOne then
+        P.succeed (makeQuadraticCurve NoLetter)
+            |= formattedQuadraticCurve
+
+    else
+        P.succeed makeQuadraticCurve
+            |= separator
+            |= formattedQuadraticCurve
+
+
+smoothQuadraticCurveCommand : Bool -> Parser CommandType
+smoothQuadraticCurveCommand parsedOne =
+    let
+        makeSmoothQuadraticCurve : Separator -> FormattedPoint -> CommandType
+        makeSmoothQuadraticCurve sep formattedTo =
+            SmoothQuadraticCurveCommand
+                { to = getPoint formattedTo }
+                { afterLetter = sep
+                , afterTo = getPointSeparator formattedTo
+                }
+    in
+    if parsedOne then
+        P.succeed (makeSmoothQuadraticCurve NoLetter)
+            |= formattedPoint
+
+    else
+        P.succeed makeSmoothQuadraticCurve
+            |= separator
+            |= formattedPoint
+
+
+type alias FormattedArcSize =
+    { size : ArcSize
+    , afterSize : Separator
+    }
+
+
+getArcSize : FormattedArcSize -> ArcSize
+getArcSize { size } =
+    size
+
+
+getArcSizeSeparator : FormattedArcSize -> Separator
+getArcSizeSeparator { afterSize } =
+    afterSize
+
+
+formattedArcSize : Parser FormattedArcSize
+formattedArcSize =
+    P.succeed FormattedArcSize
+        |= P.oneOf
+            [ P.succeed Large
+                |. P.symbol "1"
+            , P.succeed Small
+                |. P.symbol "0"
+            ]
+        |= separator
+
+
+type alias FormattedArcRotation =
+    { rotation : ArcRotation
+    , afterRotation : Separator
+    }
+
+
+getArcRotation : FormattedArcRotation -> ArcRotation
+getArcRotation { rotation } =
+    rotation
+
+
+getArcRotationSeparator : FormattedArcRotation -> Separator
+getArcRotationSeparator { afterRotation } =
+    afterRotation
+
+
+formattedArcRotation : Parser FormattedArcRotation
+formattedArcRotation =
+    P.succeed FormattedArcRotation
+        |= P.oneOf
+            [ P.succeed Clockwise
+                |. P.symbol "1"
+            , P.succeed CounterClockwise
+                |. P.symbol "0"
+            ]
+        |= separator
+
+
+type alias FormattedArc =
+    { radii : FormattedPoint
+    , angle : FormattedFloat
+    , size : FormattedArcSize
+    , rotation : FormattedArcRotation
+    , to : FormattedPoint
+    }
+
+
+type alias MakeArc =
+    Separator -> FormattedArc -> CommandType
+
+
+arcCommand : Bool -> Parser CommandType
+arcCommand parsedOne =
+    let
+        makeArc : MakeArc
+        makeArc sep { radii, angle, size, rotation, to } =
+            ArcCommand
+                { radii = getPoint radii
+                , angle = getFloat angle
+                , size = getArcSize size
+                , rotation = getArcRotation rotation
+                , to = getPoint to
+                }
+                { afterLetter = sep
+                , afterRadii = getPointSeparator radii
+                , afterAngle = getFloatSeparator angle
+                , afterSize = getArcSizeSeparator size
+                , afterRotation = getArcRotationSeparator rotation
+                , afterTo = getPointSeparator to
+                }
+
+        formattedArc : Parser FormattedArc
+        formattedArc =
+            P.succeed FormattedArc
+                |= formattedPoint
+                |= formattedFloat
+                |= formattedArcSize
+                |= formattedArcRotation
+                |= formattedPoint
+    in
+    if parsedOne then
+        P.succeed (makeArc NoLetter)
+            |= formattedArc
+
+    else
+        P.succeed makeArc
+            |= separator
+            |= formattedArc
 
 
 {-| Special case parser for a Close Command, which consists of only the letter
@@ -402,15 +711,26 @@ builderStep builder =
                 Line ->
                     makeParser (lineCommand parsedOne) "L"
 
-                _ ->
-                    if parsedOne then
-                        P.oneOf
-                            [ parameterizedCommandLetters builder
-                            , chompOne (letter ".") builder
-                            ]
+                HorizontalLine ->
+                    makeParser (horizontalLineCommand parsedOne) "H"
 
-                    else
-                        chompOne (letter ".") builder
+                VerticalLine ->
+                    makeParser (verticalLineCommand parsedOne) "V"
+
+                CubicCurve ->
+                    makeParser (cubicCurveCommand parsedOne) "C"
+
+                SmoothCubicCurve ->
+                    makeParser (smoothCubicCurveCommand parsedOne) "S"
+
+                QuadraticCurve ->
+                    makeParser (quadraticCurveCommand parsedOne) "Q"
+
+                SmoothQuadraticCurve ->
+                    makeParser (smoothQuadraticCurveCommand parsedOne) "T"
+
+                Arc ->
+                    makeParser (arcCommand parsedOne) "A"
 
         ParsedClose ->
             P.oneOf
@@ -496,16 +816,6 @@ finishBuilder { results, state } =
             results
 
 
-resultToString : Result -> String
-resultToString result =
-    case result of
-        Valid command ->
-            "V|" ++ Path.commandToString command
-
-        Invalid invalidString ->
-            "I|" ++ invalidString
-
-
 resultToCommand : Result -> Maybe Command
 resultToCommand result =
     case result of
@@ -534,6 +844,16 @@ parse commandString =
 -----------------
 -- FOR TESTING --
 -----------------
+
+
+resultToString : Result -> String
+resultToString result =
+    case result of
+        Valid command ->
+            "V|" ++ Path.commandToString command
+
+        Invalid invalidString ->
+            "I|" ++ invalidString
 
 
 parse2 : String -> List String
