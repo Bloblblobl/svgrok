@@ -1,7 +1,6 @@
 module Path.View exposing (..)
 
-import Main exposing (OverlayConfig)
-import Path2 as Path exposing (Path)
+import Path exposing (Path)
 import Point exposing (Point)
 import Svg exposing (Attribute, Svg)
 import Svg.Attributes as SvgA

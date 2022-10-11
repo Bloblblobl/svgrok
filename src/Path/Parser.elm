@@ -1,7 +1,7 @@
 module Path.Parser exposing (..)
 
 import Parser as P exposing ((|.), (|=), Parser)
-import Path2 as Path
+import Path
     exposing
         ( ArcRotation(..)
         , ArcSize(..)
