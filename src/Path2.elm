@@ -168,7 +168,7 @@ type alias Command =
 
 {-| A Segment of a Path that includes the start and end Points of the Segment as
 well as the relevant parameters (for Segments like curves and arcs), all with
-absolute values. Always has a corresponding Command.
+absolute values.
 -}
 type Segment
     = MoveSegment { from : Point, to : Point }
@@ -203,7 +203,7 @@ type alias Component =
 {-| The smallest division of a Component that can be interacted with/modified.
 -}
 type Element
-    = End
+    = EndPoint
     | StartControl
     | EndControl
     | Control
@@ -215,7 +215,7 @@ with an optional Element specified.
 -}
 type alias Selection =
     { index : Int
-    , element : Maybe Element
+    , element : Element
     }
 
 
@@ -226,6 +226,18 @@ type alias Path =
     , hovered : Maybe Selection
     , selected : List Selection
     }
+
+
+type Msg
+    = OverlayHover Selection
+    | OverlayUnhover
+    | OverlayToggleSelection Selection
+
+
+
+---------------------
+-- BUILD FUNCTIONS --
+---------------------
 
 
 {-| The implicit state of a Path, used when building up a list of Components
@@ -497,6 +509,29 @@ pointToString point separator =
         ]
 
 
+{-| Converts a Point to a String with default separators of one space between
+the values and no spaces at the end.
+-}
+pointToStringNoSpace : Point -> String
+pointToStringNoSpace point =
+    String.join " "
+        [ String.fromFloat point.x
+        , String.fromFloat point.y
+        ]
+
+
+{-| Converts a Point to a String with default separators of one space between
+the values and at the end.
+-}
+pointToStringOneSpace : Point -> String
+pointToStringOneSpace point =
+    String.join " "
+        [ String.fromFloat point.x
+        , String.fromFloat point.y
+        , ""
+        ]
+
+
 commandToString : Command -> String
 commandToString { relation, commandType } =
     let
@@ -603,3 +638,59 @@ commandToString { relation, commandType } =
 
         CloseCommand { afterLetter } ->
             letter afterLetter "Z"
+
+
+segmentToString : Segment -> String
+segmentToString segment =
+    let
+        moveString : Point -> String
+        moveString from =
+            "M" ++ pointToStringNoSpace from
+    in
+    case segment of
+        MoveSegment { from, to } ->
+            moveString from ++ moveString to
+
+        LineSegment { from, to } ->
+            moveString from ++ "L" ++ pointToStringNoSpace to
+
+        CubicCurveSegment { startControl, endControl, from, to } ->
+            String.concat
+                [ moveString from
+                , "C"
+                , pointToStringOneSpace startControl
+                , pointToStringOneSpace endControl
+                , pointToStringNoSpace to
+                ]
+
+        QuadraticCurveSegment { control, from, to } ->
+            String.concat
+                [ moveString from
+                , "Q"
+                , pointToStringOneSpace control
+                , pointToStringNoSpace to
+                ]
+
+        ArcSegment { radii, angle, size, rotation, from, to } ->
+            String.concat
+                [ moveString from
+                , "A"
+                , pointToStringOneSpace radii
+                , String.fromFloat angle ++ " "
+                , arcSizeToString size ++ " "
+                , arcRotationToString rotation ++ " "
+                , pointToStringNoSpace to
+                ]
+
+        CloseSegment { from, to } ->
+            moveString from ++ "L" ++ pointToStringNoSpace to
+
+
+toString : Path -> String
+toString { components } =
+    let
+        step : Component -> String -> String
+        step { command } commandString =
+            commandString ++ commandToString command
+    in
+    List.foldl step "" components
