@@ -229,9 +229,11 @@ type alias Path =
 
 
 type Msg
-    = OverlayHover Selection
-    | OverlayUnhover
-    | OverlayToggleSelection Selection
+    = SetHoveredElement (Maybe Selection)
+    | ToggleSelection Selection
+    | MouseMove Point
+    | SetMouseOver Bool
+    | SetMouseDown Bool
 
 
 
