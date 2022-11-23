@@ -237,6 +237,22 @@ type Msg
 
 
 
+----------------------
+-- UPDATE FUNCTIONS --
+----------------------
+
+
+update : Msg -> Path -> Path
+update msg path =
+    case msg of
+        SetHoveredElement hoveredSelection ->
+            { path | hovered = hoveredSelection }
+
+        _ ->
+            path
+
+
+
 ---------------------
 -- BUILD FUNCTIONS --
 ---------------------

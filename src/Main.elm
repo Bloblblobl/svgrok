@@ -58,8 +58,10 @@ init _ =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update _ model =
-    ( model, Cmd.none )
+update msg model =
+    case msg of
+        PathChanged pathMsg ->
+            ( model, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
