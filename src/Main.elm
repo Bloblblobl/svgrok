@@ -1,10 +1,9 @@
 module Main exposing (..)
 
 import Browser
+import Canvas
 import Html exposing (Html)
 import Path exposing (Path)
-import Path.View
-import Point exposing (Point)
 
 
 main : Program () Model Msg
@@ -18,16 +17,13 @@ main =
 
 
 type alias Model =
-    { path : Path
-    , pathString : String
-    , overlayConfig : Path.View.OverlayConfig
-    , mouseOffset : Point
-    , mouseOverOverlay : Bool
+    { pathString : String
+    , canvasState : Canvas.State
     }
 
 
-type Msg
-    = PathChanged Path.Msg
+type alias Msg =
+    Canvas.Msg
 
 
 initPath : Path
@@ -40,15 +36,8 @@ initPath =
 
 initModel : Model
 initModel =
-    { path = initPath
-    , pathString = ""
-    , overlayConfig =
-        { default = []
-        , hovered = []
-        , selected = []
-        }
-    , mouseOffset = Point.zero
-    , mouseOverOverlay = False
+    { pathString = ""
+    , canvasState = Canvas.initState
     }
 
 
@@ -59,9 +48,7 @@ init _ =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        PathChanged pathMsg ->
-            ( model, Cmd.none )
+    ( { model | canvasState = Canvas.update msg model.canvasState }, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg

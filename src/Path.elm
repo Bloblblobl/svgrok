@@ -31,7 +31,7 @@ type ArcRotation
 
 
 {-| The Separator between 2 arbitrary semantic tokens in a Command string.
-NoLetter is a special variant that indicates that the Command was parsed as a
+NoLetter is a special variant that inicdates that the Command was parsed as a
 subsequent set of parameters.
 -}
 type Separator
@@ -228,28 +228,12 @@ type alias Path =
     }
 
 
-type Msg
-    = SetHoveredElement (Maybe Selection)
-    | ToggleSelection Selection
-    | MouseMove Point
-    | SetMouseOver Bool
-    | SetMouseDown Bool
-
-
-
-----------------------
--- UPDATE FUNCTIONS --
-----------------------
-
-
-update : Msg -> Path -> Path
-update msg path =
-    case msg of
-        SetHoveredElement hoveredSelection ->
-            { path | hovered = hoveredSelection }
-
-        _ ->
-            path
+init : Path
+init =
+    { components = []
+    , hovered = Nothing
+    , selected = []
+    }
 
 
 
@@ -290,7 +274,7 @@ fromComponents components =
 
 {-| Return the absolute previous control based on the current Command being
 processed and the previous Segment. Used when resolving the implicit control
-points of smooth curve Commands into their absolute values.
+points of smooth curve Commands to their absolute values.
 -}
 absolutePreviousControl : Segment -> Command -> Point -> Point
 absolutePreviousControl previousSegment command defaultPoint =

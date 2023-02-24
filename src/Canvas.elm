@@ -1,10 +1,65 @@
-module Path.View exposing (..)
+module Canvas exposing (..)
 
-import Path exposing (Msg, Path)
+import Path exposing (Path)
 import Point exposing (Point)
 import Svg exposing (Attribute, Svg)
 import Svg.Attributes as SvgA
 import Svg.Events as SvgE
+
+
+type alias State =
+    { path : Path
+    , mouseOffset : Maybe Point
+    , overlayConfig : OverlayConfig
+    }
+
+
+initState : State
+initState =
+    { path = Path.init
+    , mouseOffset = Nothing
+    , overlayConfig = initOverlayConfig
+    }
+
+
+type Msg
+    = SetHoveredElement (Maybe Path.Selection)
+    | ToggleSelection Path.Selection
+    | MouseMove Point
+    | SetMouseOver Bool
+    | SetMouseDown Bool
+
+
+update : Msg -> State -> State
+update msg state =
+    case msg of
+        SetHoveredElement selection ->
+            let
+                { path } =
+                    state
+            in
+            { state | path = { path | hovered = selection } }
+
+        ToggleSelection selection ->
+            let
+                { path } =
+                    state
+
+                removedFromSelected : List Path.Selection
+                removedFromSelected =
+                    List.filter (\s -> s /= selection) path.selected
+            in
+            if List.member selection path.selected then
+                { state | path = { path | selected = removedFromSelected } }
+
+            else
+                { state
+                    | path =
+                        { path | selected = selection :: path.selected }
+                }
+
+        _ ->
+            state
 
 
 type alias Size a =
@@ -36,6 +91,14 @@ type alias OverlayConfig =
     }
 
 
+initOverlayConfig : OverlayConfig
+initOverlayConfig =
+    { default = []
+    , hovered = []
+    , selected = []
+    }
+
+
 type alias OverlayBuilder =
     { config : OverlayConfig
     , hovered : Maybe Path.Selection
@@ -55,20 +118,20 @@ initOverlayBuilder config { hovered, selected } =
     }
 
 
-{-| Adds relevant mouse events for a Selection to a list of Attributes.
+{-| Returns a list of mouse event Attributes for a Selection
 -}
-mouseEvents : Path.Selection -> List (Attribute Msg)
-mouseEvents selection =
-    [ SvgE.onMouseOver (Path.SetHoveredElement <| Just selection)
-    , SvgE.onMouseOut (Path.SetHoveredElement Nothing)
-    , SvgE.onClick (Path.ToggleSelection selection)
+selectionMouseEvents : Path.Selection -> List (Attribute Msg)
+selectionMouseEvents selection =
+    [ SvgE.onMouseOver (SetHoveredElement <| Just selection)
+    , SvgE.onMouseOut (SetHoveredElement Nothing)
+    , SvgE.onClick (ToggleSelection selection)
     ]
 
 
-{-| Get a list of Attributes from a Builder for a Selection.
+{-| Returns a list of Attributes for a Selection from an OverlayBuilder.
 -}
-getAttributes : OverlayBuilder -> Path.Selection -> List (Attribute Msg)
-getAttributes { config, hovered, selected } selection =
+selectionAttributes : OverlayBuilder -> Path.Selection -> List (Attribute Msg)
+selectionAttributes { config, hovered, selected } selection =
     let
         isHovered : Bool
         isHovered =
@@ -83,7 +146,7 @@ getAttributes { config, hovered, selected } selection =
         isSelected =
             List.member selection selected
     in
-    List.append (mouseEvents selection) <|
+    List.append (selectionMouseEvents selection) <|
         if isHovered then
             config.hovered
 
@@ -94,17 +157,17 @@ getAttributes { config, hovered, selected } selection =
             config.default
 
 
-{-| Renders a Path String as a single continuous SVG <path> element.
+{-| Renders a Path String as a single SVG <path> element.
 -}
-path : List (Attribute Msg) -> String -> Svg Msg
-path attributes pathString =
+viewPath : List (Attribute Msg) -> String -> Svg Msg
+viewPath attributes pathString =
     Svg.path (SvgA.d pathString :: attributes) []
 
 
-{-| Renders a Point as a SVG <circle> element.
+{-| Renders a Point as an SVG <circle> element.
 -}
-point : List (Attribute Msg) -> Point -> Svg Msg
-point attributes { x, y } =
+viewPoint : List (Attribute Msg) -> Point -> Svg Msg
+viewPoint attributes { x, y } =
     let
         pointAttributes : List (Attribute Msg)
         pointAttributes =
@@ -115,8 +178,11 @@ point attributes { x, y } =
     Svg.circle (attributes ++ pointAttributes) []
 
 
-segment : ( Int, Path.Component ) -> OverlayBuilder -> OverlayBuilder
-segment ( index, component ) builder =
+{-| Builds a Segment onto an OverlayBuilder by adding all of the relevant Points
+on the Segment as well as the Segment itself to the builder.
+-}
+buildSegment : ( Int, Path.Component ) -> OverlayBuilder -> OverlayBuilder
+buildSegment ( index, component ) builder =
     case component.segment of
         Path.MoveSegment { to } ->
             let
@@ -126,7 +192,7 @@ segment ( index, component ) builder =
 
                 endPoint : Svg Msg
                 endPoint =
-                    point (getAttributes builder selection) to
+                    viewPoint (selectionAttributes builder selection) to
             in
             { builder | points = endPoint :: builder.points }
 
@@ -138,8 +204,8 @@ segment ( index, component ) builder =
 
                 lineSegment : Svg Msg
                 lineSegment =
-                    path
-                        (getAttributes builder segmentSelection)
+                    viewPath
+                        (selectionAttributes builder segmentSelection)
                         (Path.segmentToString component.segment)
 
                 endSelection : Path.Selection
@@ -148,7 +214,7 @@ segment ( index, component ) builder =
 
                 endPoint : Svg Msg
                 endPoint =
-                    point (getAttributes builder endSelection) to
+                    viewPoint (selectionAttributes builder endSelection) to
             in
             { builder
                 | points = endPoint :: builder.points
@@ -163,8 +229,8 @@ segment ( index, component ) builder =
 
                 curveSegment : Svg Msg
                 curveSegment =
-                    path
-                        (getAttributes builder segmentSelection)
+                    viewPath
+                        (selectionAttributes builder segmentSelection)
                         (Path.segmentToString component.segment)
 
                 startSelection : Path.Selection
@@ -173,7 +239,7 @@ segment ( index, component ) builder =
 
                 startControlPoint : Svg Msg
                 startControlPoint =
-                    point (getAttributes builder startSelection) startControl
+                    viewPoint (selectionAttributes builder startSelection) startControl
 
                 endSelection : Path.Selection
                 endSelection =
@@ -181,7 +247,7 @@ segment ( index, component ) builder =
 
                 endControlPoint : Svg Msg
                 endControlPoint =
-                    point (getAttributes builder endSelection) endControl
+                    viewPoint (selectionAttributes builder endSelection) endControl
 
                 endPointSelection : Path.Selection
                 endPointSelection =
@@ -189,7 +255,7 @@ segment ( index, component ) builder =
 
                 endPoint : Svg Msg
                 endPoint =
-                    point (getAttributes builder endPointSelection) to
+                    viewPoint (selectionAttributes builder endPointSelection) to
             in
             { builder
                 | points =
@@ -207,8 +273,8 @@ segment ( index, component ) builder =
 
                 curveSegment : Svg Msg
                 curveSegment =
-                    path
-                        (getAttributes builder segmentSelection)
+                    viewPath
+                        (selectionAttributes builder segmentSelection)
                         (Path.segmentToString component.segment)
 
                 controlSelection : Path.Selection
@@ -217,7 +283,7 @@ segment ( index, component ) builder =
 
                 controlPoint : Svg Msg
                 controlPoint =
-                    point (getAttributes builder controlSelection) control
+                    viewPoint (selectionAttributes builder controlSelection) control
 
                 endSelection : Path.Selection
                 endSelection =
@@ -225,7 +291,7 @@ segment ( index, component ) builder =
 
                 endPoint : Svg Msg
                 endPoint =
-                    point (getAttributes builder endSelection) to
+                    viewPoint (selectionAttributes builder endSelection) to
             in
             { builder
                 | points = controlPoint :: endPoint :: builder.points
@@ -240,8 +306,8 @@ segment ( index, component ) builder =
 
                 arcSegment : Svg Msg
                 arcSegment =
-                    path
-                        (getAttributes builder segmentSelection)
+                    viewPath
+                        (selectionAttributes builder segmentSelection)
                         (Path.segmentToString component.segment)
 
                 endSelection : Path.Selection
@@ -250,7 +316,7 @@ segment ( index, component ) builder =
 
                 endPoint : Svg Msg
                 endPoint =
-                    point (getAttributes builder endSelection) to
+                    viewPoint (selectionAttributes builder endSelection) to
             in
             { builder
                 | points = endPoint :: builder.points
@@ -265,8 +331,8 @@ segment ( index, component ) builder =
 
                 closeSegment : Svg Msg
                 closeSegment =
-                    path
-                        (getAttributes builder segmentSelection)
+                    viewPath
+                        (selectionAttributes builder segmentSelection)
                         (Path.segmentToString component.segment)
             in
             { builder | segments = closeSegment :: builder.segments }
@@ -275,17 +341,28 @@ segment ( index, component ) builder =
 {-| Renders an overlay of a Path, with separate SVG elements for each Point and
 Segment of the Path.
 -}
-overlay : ViewBox -> OverlayConfig -> Path -> Svg Msg
-overlay viewBox config p =
+viewOverlay : ViewBox -> OverlayConfig -> Path -> Svg Msg
+viewOverlay viewBox config path =
     let
         initialBuilder : OverlayBuilder
         initialBuilder =
-            initOverlayBuilder config p
+            initOverlayBuilder config path
 
         indexedComponents : List ( Int, Path.Component )
         indexedComponents =
-            List.indexedMap Tuple.pair p.components
+            List.indexedMap Tuple.pair path.components
     in
-    List.foldl segment initialBuilder indexedComponents
+    List.foldl buildSegment initialBuilder indexedComponents
         |> (\builder -> builder.points ++ builder.segments)
         |> Svg.svg [ SvgA.viewBox (viewBoxString viewBox) ]
+
+
+{-| Renders a Path as a single SVG element as well as an overlay above it to
+interact with the Path.
+-}
+view : ViewBox -> OverlayConfig -> Path -> Svg Msg
+view viewBox config path =
+    Svg.svg []
+        [ viewOverlay viewBox config path
+        , viewPath [] (Path.toString path)
+        ]
