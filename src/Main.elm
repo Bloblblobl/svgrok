@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Browser
 import Browser.Dom exposing (Viewport)
+import Browser.Events as BrowserE
 import Canvas
 import Html exposing (Html)
 import Html.Attributes as HtmlA
@@ -11,6 +12,11 @@ import Path.Parser
 import Point exposing (Point)
 import Svg exposing (Svg)
 import Task
+
+
+viewBoxScale : Float
+viewBoxScale =
+    100
 
 
 main : Program () Model Msg
@@ -38,6 +44,7 @@ type Msg
     = CanvasMsg Canvas.Msg
     | SetViewBox Canvas.ViewBox
     | PathStringChanged String
+    | WindowResized Int Int
 
 
 initPath : Path
@@ -84,7 +91,7 @@ viewBoxFromViewport { scene } =
     , width = scene.width
     , height = scene.height
     }
-        |> scaleViewBoxTo 100
+        |> scaleViewBoxTo viewBoxScale
 
 
 getInitialViewport : Cmd Msg
@@ -114,24 +121,43 @@ update msg model =
             , Cmd.none
             )
 
+        WindowResized newWidth newHeight ->
+            let
+                newViewBox : Canvas.ViewBox
+                newViewBox =
+                    { minX = model.viewBox.minX
+                    , minY = model.viewBox.minY
+                    , width = toFloat newWidth
+                    , height = toFloat newHeight
+                    }
+            in
+            ( { model | viewBox = scaleViewBoxTo viewBoxScale newViewBox }
+            , Cmd.none
+            )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    BrowserE.onResize WindowResized
 
 
 view : Model -> Html Msg
-view { path, pathString, overlayConfig, viewBox } =
+view model =
     let
         canvas : Svg Msg
         canvas =
-            Html.map CanvasMsg (Canvas.view viewBox overlayConfig path)
+            Html.map CanvasMsg
+                (Canvas.view
+                    model.viewBox
+                    model.overlayConfig
+                    model.path
+                )
     in
-    Html.div [] [ canvas, viewUI pathString ]
+    Html.div [] [ canvas, viewUI model ]
 
 
-viewUI : String -> Html Msg
-viewUI pathString =
+viewUI : Model -> Html Msg
+viewUI { pathString } =
     Html.div
         [ HtmlA.style "position" "fixed"
         , HtmlA.style "display" "flex"
