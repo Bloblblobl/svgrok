@@ -7,18 +7,12 @@ import Svg.Attributes as SvgA
 import Svg.Events as SvgE
 
 
-type alias State =
-    { path : Path
-    , mouseOffset : Maybe Point
-    , overlayConfig : OverlayConfig
-    }
-
-
-initState : State
-initState =
-    { path = Path.init
-    , mouseOffset = Nothing
-    , overlayConfig = initOverlayConfig
+type alias State r =
+    { r
+        | path : Path
+        , mouseOffset : Maybe Point
+        , mouseOverOverlay : Bool
+        , mouseDown : Bool
     }
 
 
@@ -26,11 +20,13 @@ type Msg
     = SetHoveredElement (Maybe Path.Selection)
     | ToggleSelection Path.Selection
     | MouseMove Point
-    | SetMouseOver Bool
-    | SetMouseDown Bool
+    | MouseEnter
+    | MouseLeave
+    | MouseDown
+    | MouseUp
 
 
-update : Msg -> State -> State
+update : Msg -> State r -> State r
 update msg state =
     case msg of
         SetHoveredElement selection ->
@@ -58,8 +54,20 @@ update msg state =
                         { path | selected = selection :: path.selected }
                 }
 
-        _ ->
-            state
+        MouseMove newOffset ->
+            { state | mouseOffset = Just newOffset }
+
+        MouseEnter ->
+            { state | mouseOverOverlay = True }
+
+        MouseLeave ->
+            { state | mouseOverOverlay = False }
+
+        MouseDown ->
+            { state | mouseDown = True }
+
+        MouseUp ->
+            { state | mouseDown = False }
 
 
 type alias Size a =
@@ -71,6 +79,15 @@ type alias ViewBox =
     , minY : Float
     , width : Float
     , height : Float
+    }
+
+
+initViewBox : ViewBox
+initViewBox =
+    { minX = 0
+    , minY = 0
+    , width = 100
+    , height = 100
     }
 
 
@@ -93,9 +110,9 @@ type alias OverlayConfig =
 
 initOverlayConfig : OverlayConfig
 initOverlayConfig =
-    { default = []
-    , hovered = []
-    , selected = []
+    { default = [ SvgA.stroke "black" ]
+    , hovered = [ SvgA.stroke "yellow" ]
+    , selected = [ SvgA.stroke "blue" ]
     }
 
 
@@ -147,11 +164,11 @@ selectionAttributes { config, hovered, selected } selection =
             List.member selection selected
     in
     List.append (selectionMouseEvents selection) <|
-        if isHovered then
-            config.hovered
-
-        else if isSelected then
+        if isSelected then
             config.selected
+
+        else if isHovered then
+            config.hovered
 
         else
             config.default
@@ -173,6 +190,7 @@ viewPoint attributes { x, y } =
         pointAttributes =
             [ SvgA.cx (String.fromFloat x)
             , SvgA.cy (String.fromFloat y)
+            , SvgA.r "0.5"
             ]
     in
     Svg.circle (attributes ++ pointAttributes) []
@@ -341,8 +359,8 @@ buildSegment ( index, component ) builder =
 {-| Renders an overlay of a Path, with separate SVG elements for each Point and
 Segment of the Path.
 -}
-viewOverlay : ViewBox -> OverlayConfig -> Path -> Svg Msg
-viewOverlay viewBox config path =
+viewOverlay : OverlayConfig -> Path -> List (Svg Msg)
+viewOverlay config path =
     let
         initialBuilder : OverlayBuilder
         initialBuilder =
@@ -353,8 +371,7 @@ viewOverlay viewBox config path =
             List.indexedMap Tuple.pair path.components
     in
     List.foldl buildSegment initialBuilder indexedComponents
-        |> (\builder -> builder.points ++ builder.segments)
-        |> Svg.svg [ SvgA.viewBox (viewBoxString viewBox) ]
+        |> (\builder -> builder.segments ++ builder.points)
 
 
 {-| Renders a Path as a single SVG element as well as an overlay above it to
@@ -362,7 +379,16 @@ interact with the Path.
 -}
 view : ViewBox -> OverlayConfig -> Path -> Svg Msg
 view viewBox config path =
-    Svg.svg []
-        [ viewOverlay viewBox config path
-        , viewPath [] (Path.toString path)
+    Svg.svg
+        [ SvgA.viewBox (viewBoxString viewBox)
+        , SvgA.width "100vw"
+        , SvgA.height "100vh"
+        , SvgA.display "block"
+        ]
+        [ Svg.g
+            []
+            [ viewPath [ SvgA.stroke "black" ] (Path.toString path) ]
+        , Svg.g
+            []
+            (viewOverlay config path)
         ]
