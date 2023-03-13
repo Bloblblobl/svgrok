@@ -110,9 +110,21 @@ type alias OverlayConfig =
 
 initOverlayConfig : OverlayConfig
 initOverlayConfig =
-    { default = [ SvgA.stroke "black" ]
-    , hovered = [ SvgA.stroke "yellow" ]
-    , selected = [ SvgA.stroke "blue" ]
+    { default =
+        [ SvgA.stroke "black"
+        , SvgA.fill "none"
+        , SvgA.cursor "pointer"
+        ]
+    , hovered =
+        [ SvgA.stroke "yellow"
+        , SvgA.fill "none"
+        , SvgA.cursor "pointer"
+        ]
+    , selected =
+        [ SvgA.stroke "blue"
+        , SvgA.fill "none"
+        , SvgA.cursor "grab"
+        ]
     }
 
 
@@ -385,10 +397,10 @@ view viewBox config path =
         , SvgA.height "100vh"
         , SvgA.display "block"
         ]
+        -- [ Svg.g
+        --     []
+        --     [ viewPath [ SvgA.stroke "black" ] (Path.toString path) ]
         [ Svg.g
-            []
-            [ viewPath [ SvgA.stroke "black" ] (Path.toString path) ]
-        , Svg.g
             []
             (viewOverlay config path)
         ]
