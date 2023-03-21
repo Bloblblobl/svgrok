@@ -1,7 +1,7 @@
 module Main exposing (..)
 
 import Browser
-import Browser.Dom exposing (Viewport)
+import Browser.Dom
 import Browser.Events as BrowserE
 import Canvas
 import Html exposing (Html)
@@ -12,6 +12,7 @@ import Path.Parser
 import Point exposing (Point)
 import Svg exposing (Svg)
 import Task
+import ViewBox exposing (ViewBox)
 
 
 viewBoxScale : Float
@@ -36,13 +37,13 @@ type alias Model =
     , mouseOverOverlay : Bool
     , mouseDown : Bool
     , overlayConfig : Canvas.OverlayConfig
-    , viewBox : Canvas.ViewBox
+    , viewBox : ViewBox
     }
 
 
 type Msg
     = CanvasMsg Canvas.Msg
-    | SetViewBox Canvas.ViewBox
+    | SetViewBox ViewBox
     | PathStringChanged String
     | WindowResized Int Int
 
@@ -63,45 +64,20 @@ initModel =
     , mouseOverOverlay = False
     , mouseDown = False
     , overlayConfig = Canvas.initOverlayConfig
-    , viewBox = Canvas.initViewBox
+    , viewBox = ViewBox.init
     }
 
 
-scaleViewBoxTo : Float -> Canvas.ViewBox -> Canvas.ViewBox
-scaleViewBoxTo scaleTo viewBox =
-    let
-        scaleFactor : Float
-        scaleFactor =
-            if viewBox.width > viewBox.height then
-                scaleTo / viewBox.width
-
-            else
-                scaleTo / viewBox.height
-    in
-    { viewBox
-        | width = viewBox.width * scaleFactor
-        , height = viewBox.height * scaleFactor
-    }
-
-
-viewBoxFromViewport : Viewport -> Canvas.ViewBox
-viewBoxFromViewport { scene } =
-    { minX = 0
-    , minY = 0
-    , width = scene.width
-    , height = scene.height
-    }
-        |> scaleViewBoxTo viewBoxScale
-
-
-getInitialViewport : Cmd Msg
-getInitialViewport =
-    Task.perform (SetViewBox << viewBoxFromViewport) Browser.Dom.getViewport
+getInitialViewBoxFromViewport : Float -> Cmd Msg
+getInitialViewBoxFromViewport scaleFactor =
+    Task.perform
+        (SetViewBox << ViewBox.scale scaleFactor << ViewBox.fromViewport)
+        Browser.Dom.getViewport
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( initModel, getInitialViewport )
+    ( initModel, getInitialViewBoxFromViewport viewBoxScale )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -123,7 +99,7 @@ update msg model =
 
         WindowResized newWidth newHeight ->
             let
-                newViewBox : Canvas.ViewBox
+                newViewBox : ViewBox
                 newViewBox =
                     { minX = model.viewBox.minX
                     , minY = model.viewBox.minY
@@ -131,7 +107,7 @@ update msg model =
                     , height = toFloat newHeight
                     }
             in
-            ( { model | viewBox = scaleViewBoxTo viewBoxScale newViewBox }
+            ( { model | viewBox = ViewBox.scale viewBoxScale newViewBox }
             , Cmd.none
             )
 
@@ -157,18 +133,42 @@ view model =
 
 
 viewUI : Model -> Html Msg
-viewUI { pathString } =
+viewUI model =
     Html.div
         [ HtmlA.style "position" "fixed"
         , HtmlA.style "display" "flex"
+        , HtmlA.style "flex-direction" "column"
         , HtmlA.style "width" "100%"
         , HtmlA.style "bottom" "0"
+        ]
+        [ viewViewBoxSize model.viewBox
+        , viewPathStringInput model.pathString
+        ]
+
+
+viewViewBoxSize : ViewBox -> Html Msg
+viewViewBoxSize viewBox =
+    Html.p
+        [ HtmlA.style "margin" "0"
+        , HtmlA.style "padding-left" "10px"
+        ]
+        [ Html.text "Width: "
+        , Html.text (String.fromInt (round viewBox.width))
+        , Html.text ", Height: "
+        , Html.text (String.fromInt (round viewBox.height))
+        ]
+
+
+viewPathStringInput : String -> Html Msg
+viewPathStringInput pathString =
+    Html.div
+        [ HtmlA.style "display" "flex"
+        , HtmlA.style "padding" "10px"
         ]
         [ Html.input
             [ HtmlA.value pathString
             , HtmlE.onInput PathStringChanged
             , HtmlA.style "width" "100%"
-            , HtmlA.style "margin" "10px"
             , HtmlA.style "font-size" "64px"
             ]
             [ Html.text pathString ]

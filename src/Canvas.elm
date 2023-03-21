@@ -5,6 +5,7 @@ import Point exposing (Point)
 import Svg exposing (Attribute, Svg)
 import Svg.Attributes as SvgA
 import Svg.Events as SvgE
+import ViewBox exposing (ViewBox)
 
 
 type alias State r =
@@ -68,37 +69,6 @@ update msg state =
 
         MouseUp ->
             { state | mouseDown = False }
-
-
-type alias Size a =
-    { a | width : Float, height : Float }
-
-
-type alias ViewBox =
-    { minX : Float
-    , minY : Float
-    , width : Float
-    , height : Float
-    }
-
-
-initViewBox : ViewBox
-initViewBox =
-    { minX = 0
-    , minY = 0
-    , width = 100
-    , height = 100
-    }
-
-
-viewBoxString : ViewBox -> String
-viewBoxString { minX, minY, width, height } =
-    String.join " "
-        [ String.fromFloat minX
-        , String.fromFloat minY
-        , String.fromFloat width
-        , String.fromFloat height
-        ]
 
 
 type alias OverlayConfig =
@@ -392,14 +362,11 @@ interact with the Path.
 view : ViewBox -> OverlayConfig -> Path -> Svg Msg
 view viewBox config path =
     Svg.svg
-        [ SvgA.viewBox (viewBoxString viewBox)
+        [ SvgA.viewBox (ViewBox.toString viewBox)
         , SvgA.width "100vw"
         , SvgA.height "100vh"
         , SvgA.display "block"
         ]
-        -- [ Svg.g
-        --     []
-        --     [ viewPath [ SvgA.stroke "black" ] (Path.toString path) ]
         [ Svg.g
             []
             (viewOverlay config path)
