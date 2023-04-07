@@ -1,5 +1,6 @@
 module Path exposing (..)
 
+import Old.Path exposing (CommandType(..))
 import Point exposing (Point)
 
 
@@ -456,6 +457,416 @@ buildComponents commands =
     List.foldl buildComponent initComponentBuilder commands
         |> .components
         |> List.reverse
+
+
+
+----------------------
+-- UPDATE FUNCTIONS --
+----------------------
+
+
+updateFromCommand : Command -> Point -> Point -> Command
+updateFromCommand command oldFrom offset =
+    case ( command.relation, command.commandType ) of
+        ( Relative, MoveCommand { to } format ) ->
+            { relation = Relative
+            , commandType =
+                MoveCommand { to = Point.subtract to offset } format
+            }
+
+        ( Relative, LineCommand { to } format ) ->
+            { relation = Relative
+            , commandType =
+                LineCommand { to = Point.subtract to offset } format
+            }
+
+        -- convert HorizontalLine to normal Line if there is a Y offset
+        ( relation, HorizontalLineCommand { toX } { afterLetter, afterToX } ) ->
+            if offset.y /= 0 then
+                let
+                    newTo : Point
+                    newTo =
+                        case relation of
+                            Absolute ->
+                                { x = toX, y = oldFrom.y }
+
+                            Relative ->
+                                { x = toX - offset.x, y = offset.y }
+
+                    newFormat : BaseFormat
+                    newFormat =
+                        { afterLetter = afterLetter
+                        , afterTo = { x = afterToX, y = afterToX }
+                        }
+                in
+                { relation = relation
+                , commandType =
+                    LineCommand { to = newTo } newFormat
+                }
+
+            else if relation == Relative then
+                { relation = Relative
+                , commandType =
+                    HorizontalLineCommand
+                        { toX = toX - offset.x }
+                        { afterLetter = afterLetter, afterToX = afterToX }
+                }
+
+            else
+                command
+
+        -- convert VerticalLine to normal Line if there is an X offset
+        ( relation, VerticalLineCommand { toY } { afterLetter, afterToY } ) ->
+            if offset.x /= 0 then
+                let
+                    newTo : Point
+                    newTo =
+                        case relation of
+                            Absolute ->
+                                { x = oldFrom.x, y = toY }
+
+                            Relative ->
+                                { x = offset.x, y = toY - offset.y }
+
+                    newFormat : BaseFormat
+                    newFormat =
+                        { afterLetter = afterLetter
+                        , afterTo = { x = afterToY, y = afterToY }
+                        }
+                in
+                { relation = relation
+                , commandType =
+                    LineCommand { to = newTo } newFormat
+                }
+
+            else if relation == Relative then
+                { relation = Relative
+                , commandType =
+                    VerticalLineCommand
+                        { toY = toY - offset.y }
+                        { afterLetter = afterLetter, afterToY = afterToY }
+                }
+
+            else
+                command
+
+        ( Relative, CubicCurveCommand params format ) ->
+            { relation = Relative
+            , commandType =
+                CubicCurveCommand
+                    { params | to = Point.subtract params.to offset }
+                    format
+            }
+
+        ( Relative, SmoothCubicCurveCommand params format ) ->
+            { relation = Relative
+            , commandType =
+                SmoothCubicCurveCommand
+                    { params | to = Point.subtract params.to offset }
+                    format
+            }
+
+        ( Relative, QuadraticCurveCommand params format ) ->
+            { relation = Relative
+            , commandType =
+                QuadraticCurveCommand
+                    { params | to = Point.subtract params.to offset }
+                    format
+            }
+
+        ( Relative, SmoothQuadraticCurveCommand params format ) ->
+            { relation = Relative
+            , commandType =
+                SmoothQuadraticCurveCommand
+                    { params | to = Point.subtract params.to offset }
+                    format
+            }
+
+        ( Relative, ArcCommand params format ) ->
+            { relation = Relative
+            , commandType =
+                ArcCommand
+                    { params | to = Point.subtract params.to offset }
+                    format
+            }
+
+        _ ->
+            command
+
+
+{-| Updates the from parameter of a Component to a new absolute point. Updates
+the Segment's from value directly and calls updateFromCommand to handle updating
+the Command.
+-}
+updateFrom : Component -> Point -> Component
+updateFrom { command, segment } newFrom =
+    case segment of
+        MoveSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newFrom params.from
+            in
+            { command = updateFromCommand command params.from offset
+            , segment =
+                MoveSegment { params | from = Point.add offset params.from }
+            }
+
+        LineSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newFrom params.from
+            in
+            { command = updateFromCommand command params.from offset
+            , segment =
+                LineSegment { params | from = Point.add offset params.from }
+            }
+
+        QuadraticCurveSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newFrom params.from
+            in
+            { command = updateFromCommand command params.from offset
+            , segment =
+                QuadraticCurveSegment
+                    { params
+                        | from = Point.add offset params.from
+                    }
+            }
+
+        CubicCurveSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newFrom params.from
+            in
+            { command = updateFromCommand command params.from offset
+            , segment =
+                CubicCurveSegment
+                    { params
+                        | from = Point.add offset params.from
+                    }
+            }
+
+        ArcSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newFrom params.from
+            in
+            { command = updateFromCommand command params.from offset
+            , segment =
+                ArcSegment { params | from = Point.add offset params.from }
+            }
+
+        CloseSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newFrom params.from
+            in
+            -- The CloseCommand never needs to be updated
+            { command = command
+            , segment =
+                CloseSegment { params | from = Point.add offset params.from }
+            }
+
+
+updateToCommand : Command -> Point -> Point -> Command
+updateToCommand command oldTo offset =
+    case command.commandType of
+        MoveCommand { to } format ->
+            { command
+                | commandType = MoveCommand { to = Point.add to offset } format
+            }
+
+        LineCommand { to } format ->
+            { command
+                | commandType = LineCommand { to = Point.add to offset } format
+            }
+
+        -- convert HorizontalLine to normal Line if there is a Y offset
+        HorizontalLineCommand { toX } { afterLetter, afterToX } ->
+            if offset.y /= 0 then
+                let
+                    newTo : Point
+                    newTo =
+                        case command.relation of
+                            Absolute ->
+                                { x = toX + offset.x, y = oldTo.y + offset.y }
+
+                            Relative ->
+                                { x = toX + offset.x, y = offset.y }
+
+                    newFormat : BaseFormat
+                    newFormat =
+                        { afterLetter = afterLetter
+                        , afterTo = { x = afterToX, y = afterToX }
+                        }
+                in
+                { command
+                    | commandType =
+                        LineCommand { to = newTo } newFormat
+                }
+
+            else
+                { command
+                    | commandType =
+                        HorizontalLineCommand
+                            { toX = toX + offset.x }
+                            { afterLetter = afterLetter, afterToX = afterToX }
+                }
+
+        -- convert VerticalLine to normal Line if there is an X offset
+        VerticalLineCommand { toY } { afterLetter, afterToY } ->
+            if offset.x /= 0 then
+                let
+                    newTo : Point
+                    newTo =
+                        case command.relation of
+                            Absolute ->
+                                { x = oldTo.x + offset.x, y = toY + offset.y }
+
+                            Relative ->
+                                { x = offset.x, y = toY + offset.y }
+
+                    newFormat : BaseFormat
+                    newFormat =
+                        { afterLetter = afterLetter
+                        , afterTo = { x = afterToY, y = afterToY }
+                        }
+                in
+                { command
+                    | commandType =
+                        LineCommand { to = newTo } newFormat
+                }
+
+            else
+                { command
+                    | commandType =
+                        VerticalLineCommand
+                            { toY = toY + offset.y }
+                            { afterLetter = afterLetter, afterToY = afterToY }
+                }
+
+        CubicCurveCommand params format ->
+            { command
+                | commandType =
+                    CubicCurveCommand
+                        { params | to = Point.add params.to offset }
+                        format
+            }
+
+        SmoothCubicCurveCommand params format ->
+            { command
+                | commandType =
+                    SmoothCubicCurveCommand
+                        { params | to = Point.add params.to offset }
+                        format
+            }
+
+        QuadraticCurveCommand params format ->
+            { command
+                | commandType =
+                    QuadraticCurveCommand
+                        { params | to = Point.add params.to offset }
+                        format
+            }
+
+        SmoothQuadraticCurveCommand params format ->
+            { command
+                | commandType =
+                    SmoothQuadraticCurveCommand
+                        { params | to = Point.add params.to offset }
+                        format
+            }
+
+        ArcCommand params format ->
+            { command
+                | commandType =
+                    ArcCommand
+                        { params | to = Point.add params.to offset }
+                        format
+            }
+
+        _ ->
+            command
+
+
+{-| Updates the to parameter of a Component to a new absolute point. Updates
+the Segment's to value directly and calls updateToCommand to handle updating
+the Command.
+-}
+updateTo : Component -> Point -> Component
+updateTo { command, segment } newTo =
+    case segment of
+        MoveSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newTo params.to
+            in
+            { command = updateToCommand command params.to offset
+            , segment = MoveSegment { params | to = Point.add offset params.to }
+            }
+
+        LineSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newTo params.to
+            in
+            { command = updateToCommand command params.to offset
+            , segment = LineSegment { params | to = Point.add offset params.to }
+            }
+
+        QuadraticCurveSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newTo params.to
+            in
+            { command = updateToCommand command params.to offset
+            , segment =
+                QuadraticCurveSegment
+                    { params | to = Point.add offset params.to }
+            }
+
+        CubicCurveSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newTo params.to
+            in
+            { command = updateToCommand command params.to offset
+            , segment =
+                CubicCurveSegment { params | to = Point.add offset params.to }
+            }
+
+        ArcSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newTo params.to
+            in
+            { command = updateToCommand command params.to offset
+            , segment = ArcSegment { params | to = Point.add offset params.to }
+            }
+
+        CloseSegment params ->
+            let
+                offset : Point
+                offset =
+                    Point.subtract newTo params.to
+            in
+            -- The CloseCommand never needs to be updated
+            { command = command
+            , segment =
+                CloseSegment { params | to = Point.add offset params.to }
+            }
 
 
 

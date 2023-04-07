@@ -7,6 +7,7 @@ import Canvas
 import Html exposing (Html)
 import Html.Attributes as HtmlA
 import Html.Events as HtmlE
+import Json.Decode as JsonD
 import Path exposing (Path)
 import Path.Parser
 import Point exposing (Point)
@@ -35,7 +36,7 @@ type alias Model =
     , path : Path
     , mouseOffset : Maybe Point
     , mouseOverOverlay : Bool
-    , mouseDown : Bool
+    , mouseDown : Maybe Point
     , overlayConfig : Canvas.OverlayConfig
     , viewBox : ViewBox
     }
@@ -62,7 +63,7 @@ initModel =
     , path = Path.init
     , mouseOffset = Nothing
     , mouseOverOverlay = False
-    , mouseDown = False
+    , mouseDown = Nothing
     , overlayConfig = Canvas.initOverlayConfig
     , viewBox = ViewBox.init
     }
@@ -105,6 +106,8 @@ update msg model =
                     , minY = model.viewBox.minY
                     , width = toFloat newWidth
                     , height = toFloat newHeight
+                    , actualWidth = toFloat newWidth
+                    , actualHeight = toFloat newHeight
                     }
             in
             ( { model | viewBox = ViewBox.scale viewBoxScale newViewBox }
@@ -112,9 +115,43 @@ update msg model =
             )
 
 
+decodeMouseOffset : JsonD.Decoder Point
+decodeMouseOffset =
+    JsonD.map2 Point
+        (JsonD.field "offsetX" JsonD.float)
+        (JsonD.field "offsetY" JsonD.float)
+
+
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    BrowserE.onResize WindowResized
+subscriptions model =
+    (if model.mouseOverOverlay then
+        [ BrowserE.onMouseMove <|
+            JsonD.map (CanvasMsg << Canvas.MouseMove) decodeMouseOffset
+        , BrowserE.onMouseDown <|
+            JsonD.map (CanvasMsg << Canvas.MouseDown) decodeMouseOffset
+        , BrowserE.onMouseUp (JsonD.succeed (CanvasMsg Canvas.MouseUp))
+        , BrowserE.onResize WindowResized
+        ]
+
+     else if model.mouseDown /= Nothing then
+        [ BrowserE.onMouseUp (JsonD.succeed (CanvasMsg Canvas.MouseUp))
+        , BrowserE.onResize WindowResized
+        ]
+
+     else
+        [ BrowserE.onResize WindowResized
+        ]
+    )
+        |> Sub.batch
+
+
+stringFromBool : Bool -> String
+stringFromBool value =
+    if value then
+        "True"
+
+    else
+        "False"
 
 
 view : Model -> Html Msg
@@ -141,7 +178,21 @@ viewUI model =
         , HtmlA.style "width" "100%"
         , HtmlA.style "bottom" "0"
         ]
-        [ viewViewBoxSize model.viewBox
+        [ Html.p [ HtmlA.style "padding-left" "10px" ]
+            [ Html.text
+                (Point.toString
+                    (Maybe.withDefault Point.zero model.mouseOffset)
+                )
+            ]
+        , Html.p [ HtmlA.style "padding-left" "10px" ]
+            [ Html.text <| "over: " ++ stringFromBool model.mouseOverOverlay ]
+        , Html.p [ HtmlA.style "padding-left" "10px" ]
+            [ Html.text <|
+                "down: "
+                    ++ Point.toString
+                        (Maybe.withDefault Point.zero model.mouseDown)
+            ]
+        , viewViewBoxSize model.viewBox
         , viewPathStringInput model.pathString
         ]
 

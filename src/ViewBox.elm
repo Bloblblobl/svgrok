@@ -1,6 +1,7 @@
 module ViewBox exposing (..)
 
 import Browser.Dom
+import Point exposing (Point)
 
 
 type alias ViewBox =
@@ -8,6 +9,8 @@ type alias ViewBox =
     , minY : Float
     , width : Float
     , height : Float
+    , actualWidth : Float
+    , actualHeight : Float
     }
 
 
@@ -15,8 +18,10 @@ init : ViewBox
 init =
     { minX = 0
     , minY = 0
-    , width = 100
-    , height = 100
+    , width = 0
+    , height = 0
+    , actualWidth = 0
+    , actualHeight = 0
     }
 
 
@@ -36,6 +41,8 @@ fromViewport { scene } =
     , minY = 0
     , width = scene.width
     , height = scene.height
+    , actualWidth = scene.width
+    , actualHeight = scene.height
     }
 
 
@@ -53,4 +60,11 @@ scale scaleTarget viewBox =
     { viewBox
         | width = viewBox.width * scaleFactor
         , height = viewBox.height * scaleFactor
+    }
+
+
+scalePoint : ViewBox -> Point -> Point
+scalePoint { width, height, actualWidth, actualHeight } { x, y } =
+    { x = toFloat << round <| x * width / actualWidth
+    , y = toFloat << round <| y * height / actualHeight
     }

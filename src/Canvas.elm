@@ -1,6 +1,7 @@
 module Canvas exposing (..)
 
-import Path exposing (Path)
+import Json.Decode exposing (index)
+import Path exposing (Element(..), Path)
 import Point exposing (Point)
 import Svg exposing (Attribute, Svg)
 import Svg.Attributes as SvgA
@@ -13,7 +14,8 @@ type alias State r =
         | path : Path
         , mouseOffset : Maybe Point
         , mouseOverOverlay : Bool
-        , mouseDown : Bool
+        , mouseDown : Maybe Point
+        , viewBox : ViewBox
     }
 
 
@@ -23,7 +25,7 @@ type Msg
     | MouseMove Point
     | MouseEnter
     | MouseLeave
-    | MouseDown
+    | MouseDown Point
     | MouseUp
 
 
@@ -56,7 +58,10 @@ update msg state =
                 }
 
         MouseMove newOffset ->
-            { state | mouseOffset = Just newOffset }
+            { state
+                | mouseOffset =
+                    Just (ViewBox.scalePoint state.viewBox newOffset)
+            }
 
         MouseEnter ->
             { state | mouseOverOverlay = True }
@@ -64,11 +69,49 @@ update msg state =
         MouseLeave ->
             { state | mouseOverOverlay = False }
 
-        MouseDown ->
-            { state | mouseDown = True }
+        MouseDown mouseOffset ->
+            { state
+                | mouseDown =
+                    Just (ViewBox.scalePoint state.viewBox mouseOffset)
+            }
 
         MouseUp ->
-            { state | mouseDown = False }
+            { state | mouseDown = Nothing }
+
+
+
+-- moveSelection : Point -> ( Int, Path.Component ) -> Path -> Path
+-- moveSelection offset ( index, component ) path =
+--     let
+--         fromSelection : Path.Selection
+--         fromSelection =
+--             { index = index - 1, element = EndPoint }
+--         toSelection : Path.Selection
+--         toSelection =
+--             { index = index, element = EndPoint }
+--         updatedFrom : Component
+--         updatedFrom =
+--             if List.member fromSelection path.selected then
+--                 Path.updateFrom
+--             else
+--                 component
+--     in
+--     path
+-- type alias UpdatedEndpoint =
+--     { from : Maybe Point, to : Maybe Point }
+-- updatedEndpointsForSelections : Path -> Point -> List UpdatedEndpoint
+-- updatedEndpointsForSelections
+-- moveSelections : Path -> Point -> Path
+-- moveSelections path offset =
+--     let
+--         indexedComponents : List ( Int, Path.Component )
+--         indexedComponents =
+--             List.indexedMap Tuple.pair path.components
+--     in
+--     List.foldl
+--         (moveSelection offset)
+--         { path | components = [] }
+--         indexedComponents
 
 
 type alias OverlayConfig =
@@ -366,6 +409,8 @@ view viewBox config path =
         , SvgA.width "100vw"
         , SvgA.height "100vh"
         , SvgA.display "block"
+        , SvgE.onMouseOver MouseEnter
+        , SvgE.onMouseOut MouseLeave
         ]
         [ Svg.g
             []
