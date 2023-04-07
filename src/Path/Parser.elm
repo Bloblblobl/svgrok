@@ -239,9 +239,17 @@ moveCommand parsedOne =
                 { afterLetter = sep
                 , afterTo = getPointSeparator formattedTo
                 }
+
+        makeLine : Separator -> FormattedPoint -> CommandType
+        makeLine sep formattedTo =
+            LineCommand
+                { to = getPoint formattedTo }
+                { afterLetter = sep
+                , afterTo = getPointSeparator formattedTo
+                }
     in
     if parsedOne then
-        P.succeed (makeMove NoLetter)
+        P.succeed (makeLine NoLetter)
             |= formattedPoint
 
     else
