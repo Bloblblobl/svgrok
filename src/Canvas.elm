@@ -11,7 +11,8 @@ import ViewBox exposing (ViewBox)
 
 type alias State r =
     { r
-        | path : Path
+        | pathString : String
+        , path : Path
         , mouseOffset : Maybe Point
         , mouseOverOverlay : Bool
         , mouseDown : Maybe Point
@@ -76,42 +77,23 @@ update msg state =
             }
 
         MouseUp ->
-            { state | mouseDown = Nothing }
+            let
+                newPath : Path
+                newPath =
+                    case ( state.mouseDown, state.mouseOffset ) of
+                        ( Just mouseDown, Just mouseOffset ) ->
+                            Path.update
+                                state.path
+                                (Point.subtract mouseOffset mouseDown)
 
-
-
--- moveSelection : Point -> ( Int, Path.Component ) -> Path -> Path
--- moveSelection offset ( index, component ) path =
---     let
---         fromSelection : Path.Selection
---         fromSelection =
---             { index = index - 1, element = EndPoint }
---         toSelection : Path.Selection
---         toSelection =
---             { index = index, element = EndPoint }
---         updatedFrom : Component
---         updatedFrom =
---             if List.member fromSelection path.selected then
---                 Path.updateFrom
---             else
---                 component
---     in
---     path
--- type alias UpdatedEndpoint =
---     { from : Maybe Point, to : Maybe Point }
--- updatedEndpointsForSelections : Path -> Point -> List UpdatedEndpoint
--- updatedEndpointsForSelections
--- moveSelections : Path -> Point -> Path
--- moveSelections path offset =
---     let
---         indexedComponents : List ( Int, Path.Component )
---         indexedComponents =
---             List.indexedMap Tuple.pair path.components
---     in
---     List.foldl
---         (moveSelection offset)
---         { path | components = [] }
---         indexedComponents
+                        _ ->
+                            state.path
+            in
+            { state
+                | path = newPath
+                , mouseDown = Nothing
+                , pathString = Path.toString newPath
+            }
 
 
 type alias OverlayConfig =
