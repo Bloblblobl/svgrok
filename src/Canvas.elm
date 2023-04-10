@@ -52,6 +52,7 @@ type alias PartialModel r =
 type Msg
     = SetHoveredElement (Maybe Path.Selection)
     | ToggleSelection Path.Selection
+    | ClearSelections
     | MouseMove Point
     | MouseDown
     | MouseDownElement Path.Selection
@@ -98,6 +99,20 @@ update msg model =
 
         ToggleSelection selection ->
             { model | path = toggleSelection model.path selection }
+
+        ClearSelections ->
+            let
+                test : String
+                test =
+                    Debug.log "click" ""
+            in
+            { model
+                | path =
+                    { components = model.path.components
+                    , hovered = model.path.hovered
+                    , selected = []
+                    }
+            }
 
         MouseMove newOffset ->
             { model | mouseOffset = ViewBox.scalePoint model.viewBox newOffset }
@@ -280,7 +295,7 @@ viewPoint attributes { x, y } =
             , SvgA.r "0.5"
             ]
     in
-    Svg.circle (attributes ++ pointAttributes) []
+    Svg.circle (pointAttributes ++ attributes) []
 
 
 {-| Builds a Segment onto an OverlayBuilder by adding all of the relevant Points
@@ -461,6 +476,66 @@ viewOverlay config path =
         |> (\builder -> builder.segments ++ builder.points)
 
 
+viewSelectedPoints : Path -> List (Svg Msg)
+viewSelectedPoints path =
+    let
+        indexedComponents : List ( Int, Path.Component )
+        indexedComponents =
+            List.indexedMap Tuple.pair path.components
+
+        getSelection : Int -> Path.Selection
+        getSelection index =
+            { index = index, element = Path.EndPoint }
+
+        selectedComponents : List Path.Component
+        selectedComponents =
+            List.filterMap
+                (\( index, component ) ->
+                    if List.member (getSelection index) path.selected then
+                        Just component
+
+                    else
+                        Nothing
+                )
+                indexedComponents
+
+        selectedPoints : List Point
+        selectedPoints =
+            List.map Path.componentEndpoint selectedComponents
+
+        viewSelectedPoint : Point -> Svg Msg
+        viewSelectedPoint =
+            viewPoint [ SvgA.fill "black", SvgA.stroke "none", SvgA.r "1" ]
+    in
+    List.map viewSelectedPoint selectedPoints
+
+
+viewGhost : Path -> Svg Msg
+viewGhost path =
+    Svg.g
+        [ SvgA.fill "none"
+        , SvgA.stroke "black"
+        , SvgA.strokeWidth "0.5"
+        , SvgA.strokeDasharray "0.5 0.5"
+        , SvgA.opacity "0.5"
+        , SvgA.cursor "grab"
+        ]
+        (viewPath [] (Path.toString path) :: viewSelectedPoints path)
+
+
+viewBackground : Svg Msg
+viewBackground =
+    Svg.rect
+        [ SvgA.x "0"
+        , SvgA.y "0"
+        , SvgA.width "100%"
+        , SvgA.height "100%"
+        , SvgA.fill "transparent"
+        , SvgE.onClick ClearSelections
+        ]
+        []
+
+
 {-| Renders a Path as a single SVG element as well as an overlay above it to
 interact with the Path.
 -}
@@ -471,10 +546,7 @@ view viewBox config path ghost =
         overlay =
             case ghost of
                 Just ghostPath ->
-                    List.concat
-                        [ viewOverlay draggingOverlayConfig ghostPath
-                        , viewOverlay config path
-                        ]
+                    viewGhost ghostPath :: viewOverlay config path
 
                 Nothing ->
                     viewOverlay config path
@@ -485,4 +557,6 @@ view viewBox config path ghost =
         , SvgA.height "100vh"
         , SvgA.display "block"
         ]
-        [ Svg.g [] overlay ]
+        [ viewBackground
+        , Svg.g [] overlay
+        ]

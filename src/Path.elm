@@ -313,6 +313,28 @@ init =
     }
 
 
+componentEndpoint : Component -> Point
+componentEndpoint component =
+    case component.segment of
+        MoveSegment { to } ->
+            to
+
+        LineSegment { to } ->
+            to
+
+        CubicCurveSegment { to } ->
+            to
+
+        QuadraticCurveSegment { to } ->
+            to
+
+        ArcSegment { to } ->
+            to
+
+        CloseSegment { to } ->
+            to
+
+
 
 ---------------------
 -- BUILD FUNCTIONS --
