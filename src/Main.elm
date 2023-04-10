@@ -143,6 +143,28 @@ stringFromBool value =
 view : Model -> Html Msg
 view model =
     let
+        ghost : Maybe Path
+        ghost =
+            case model.state of
+                Canvas.Dragging { dragStart, temporarySelection } ->
+                    case temporarySelection of
+                        Just selection ->
+                            Just
+                                (Path.update
+                                    (Canvas.addSelection model.path selection)
+                                    (Point.subtract model.mouseOffset dragStart)
+                                )
+
+                        Nothing ->
+                            Just
+                                (Path.update
+                                    model.path
+                                    (Point.subtract model.mouseOffset dragStart)
+                                )
+
+                _ ->
+                    Nothing
+
         canvas : Svg Msg
         canvas =
             Html.map CanvasMsg
@@ -150,6 +172,7 @@ view model =
                     model.viewBox
                     model.overlayConfig
                     model.path
+                    ghost
                 )
     in
     Html.div [] [ canvas, viewUI model ]

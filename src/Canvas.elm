@@ -108,24 +108,13 @@ update msg model =
         MouseDownElement selection ->
             case model.state of
                 Neutral ->
-                    if List.member selection model.path.selected then
-                        { model
-                            | state =
-                                Dragging
-                                    { dragStart = model.mouseOffset
-                                    , temporarySelection = Nothing
-                                    }
-                        }
-
-                    else
-                        { model
-                            | state =
-                                Dragging
-                                    { dragStart = model.mouseOffset
-                                    , temporarySelection = Just selection
-                                    }
-                            , path = addSelection model.path selection
-                        }
+                    { model
+                        | state =
+                            Dragging
+                                { dragStart = model.mouseOffset
+                                , temporarySelection = Just selection
+                                }
+                    }
 
                 Dragging _ ->
                     model
@@ -143,20 +132,21 @@ update msg model =
 
                         newPath : Path
                         newPath =
-                            Path.update model.path dragOffset
+                            case temporarySelection of
+                                Just selection ->
+                                    Path.update
+                                        (addSelection model.path selection)
+                                        dragOffset
+
+                                Nothing ->
+                                    Path.update model.path dragOffset
 
                         newPathString : String
                         newPathString =
                             Path.toString newPath
                     in
                     { model
-                        | path =
-                            case temporarySelection of
-                                Just selection ->
-                                    removeSelection newPath selection
-
-                                Nothing ->
-                                    newPath
+                        | path = newPath
                         , pathString = newPathString
                         , state = Neutral
                     }
@@ -185,6 +175,29 @@ initOverlayConfig =
         [ SvgA.stroke "blue"
         , SvgA.fill "none"
         , SvgA.cursor "grab"
+        ]
+    }
+
+
+draggingOverlayConfig : OverlayConfig
+draggingOverlayConfig =
+    { default =
+        [ SvgA.stroke "black"
+        , SvgA.fill "none"
+        , SvgA.cursor "pointer"
+        , SvgA.opacity "0.5"
+        ]
+    , hovered =
+        [ SvgA.stroke "black"
+        , SvgA.fill "none"
+        , SvgA.cursor "pointer"
+        , SvgA.opacity "0.5"
+        ]
+    , selected =
+        [ SvgA.stroke "black"
+        , SvgA.fill "none"
+        , SvgA.cursor "grab"
+        , SvgA.opacity "0.5"
         ]
     }
 
@@ -451,15 +464,25 @@ viewOverlay config path =
 {-| Renders a Path as a single SVG element as well as an overlay above it to
 interact with the Path.
 -}
-view : ViewBox -> OverlayConfig -> Path -> Svg Msg
-view viewBox config path =
+view : ViewBox -> OverlayConfig -> Path -> Maybe Path -> Svg Msg
+view viewBox config path ghost =
+    let
+        overlay : List (Svg Msg)
+        overlay =
+            case ghost of
+                Just ghostPath ->
+                    List.concat
+                        [ viewOverlay draggingOverlayConfig ghostPath
+                        , viewOverlay config path
+                        ]
+
+                Nothing ->
+                    viewOverlay config path
+    in
     Svg.svg
         [ SvgA.viewBox (ViewBox.toString viewBox)
         , SvgA.width "100vw"
         , SvgA.height "100vh"
         , SvgA.display "block"
         ]
-        [ Svg.g
-            []
-            (viewOverlay config path)
-        ]
+        [ Svg.g [] overlay ]
