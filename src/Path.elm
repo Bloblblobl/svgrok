@@ -76,30 +76,33 @@ type alias CloseFormat =
     { afterLetter : Separator }
 
 
+expandedLetterSeparator : Separator
+expandedLetterSeparator =
+    Spaces 1
+
+
 expandHorizontalFormat : HorizontalLineFormat -> BaseFormat
 expandHorizontalFormat { afterLetter, afterToX } =
-    if afterToX == Spaces 0 then
-        { afterLetter = afterLetter
-        , afterTo = { x = Spaces 1, y = Spaces 0 }
-        }
+    { afterLetter = afterLetter
+    , afterTo =
+        if afterToX == Spaces 0 then
+            { x = Spaces 1, y = Spaces 0 }
 
-    else
-        { afterLetter = afterLetter
-        , afterTo = { x = afterToX, y = afterToX }
-        }
+        else
+            { x = afterToX, y = afterToX }
+    }
 
 
 expandVerticalFormat : VerticalLineFormat -> BaseFormat
 expandVerticalFormat { afterLetter, afterToY } =
-    if afterToY == Spaces 0 then
-        { afterLetter = afterLetter
-        , afterTo = { x = Spaces 1, y = Spaces 0 }
-        }
+    { afterLetter = afterLetter
+    , afterTo =
+        if afterToY == Spaces 0 then
+            { x = Spaces 1, y = Spaces 0 }
 
-    else
-        { afterLetter = afterLetter
-        , afterTo = { x = afterToY, y = afterToY }
-        }
+        else
+            { x = afterToY, y = afterToY }
+    }
 
 
 expandSmoothCubicFormat : SmoothCubicCurveFormat -> CubicCurveFormat
@@ -113,17 +116,15 @@ expandSmoothCubicFormat { afterLetter, afterEndControl, afterTo } =
 
 expandSmoothQuadraticFormat : BaseFormat -> QuadraticCurveFormat
 expandSmoothQuadraticFormat { afterLetter, afterTo } =
-    if afterTo.y == Spaces 0 then
-        { afterLetter = afterLetter
-        , afterControl = { x = afterTo.x, y = Spaces 1 }
-        , afterTo = afterTo
-        }
+    { afterLetter = afterLetter
+    , afterControl =
+        if afterTo.y == Spaces 0 then
+            { x = afterTo.x, y = Spaces 1 }
 
-    else
-        { afterLetter = afterLetter
-        , afterControl = afterTo
-        , afterTo = afterTo
-        }
+        else
+            afterTo
+    , afterTo = afterTo
+    }
 
 
 
@@ -540,12 +541,112 @@ buildComponents commands =
 ----------------------
 
 
+defaultPointSeparator : PointSeparator
+defaultPointSeparator =
+    { x = Spaces 0, y = Spaces 0 }
+
+
+defaultLineCommand : Relation -> Command
+defaultLineCommand relation =
+    { relation = relation
+    , commandType =
+        LineCommand
+            { to = Point.zero }
+            { afterLetter = Spaces 0, afterTo = defaultPointSeparator }
+    }
+
+
+defaultCubicCurveCommand : Relation -> Command
+defaultCubicCurveCommand relation =
+    { relation = relation
+    , commandType =
+        CubicCurveCommand
+            { to = Point.zero
+            , startControl = Point.zero
+            , endControl = Point.zero
+            }
+            { afterLetter = Spaces 0
+            , afterStartControl = defaultPointSeparator
+            , afterEndControl = defaultPointSeparator
+            , afterTo = defaultPointSeparator
+            }
+    }
+
+
+defaultQuadraticCurveCommand : Relation -> Command
+defaultQuadraticCurveCommand relation =
+    { relation = relation
+    , commandType =
+        QuadraticCurveCommand
+            { to = Point.zero, control = Point.zero }
+            { afterLetter = Spaces 0
+            , afterControl = defaultPointSeparator
+            , afterTo = defaultPointSeparator
+            }
+    }
+
+
+{-| Determines whether thisCommand is in sequence with lastCommand. In other
+words, whether thisCommand is the same type of Command and relation as
+lastCommand. This is used when expanding the shorthand commands to determine
+whether the afterLetter separator should be changed from `NoLetter`. If a
+shorthand command is expanded, has a NoLetter separator (AKA is part of an
+implicit sequence), and is not in sequence with the previous command, then the
+afterLetter separator should be changed so that the String representation
+of the expanded command is correct.
+-}
+commandInSequence : Command -> Command -> Bool
+commandInSequence lastCommand thisCommand =
+    let
+        sameRelation : Bool
+        sameRelation =
+            lastCommand.relation == thisCommand.relation
+    in
+    case ( lastCommand.commandType, thisCommand.commandType ) of
+        ( MoveCommand _ _, MoveCommand _ _ ) ->
+            sameRelation
+
+        ( MoveCommand _ _, LineCommand _ _ ) ->
+            sameRelation
+
+        ( LineCommand _ _, LineCommand _ _ ) ->
+            sameRelation
+
+        ( HorizontalLineCommand _ _, HorizontalLineCommand _ _ ) ->
+            sameRelation
+
+        ( VerticalLineCommand _ _, VerticalLineCommand _ _ ) ->
+            sameRelation
+
+        ( CubicCurveCommand _ _, CubicCurveCommand _ _ ) ->
+            sameRelation
+
+        ( SmoothCubicCurveCommand _ _, SmoothCubicCurveCommand _ _ ) ->
+            sameRelation
+
+        ( QuadraticCurveCommand _ _, QuadraticCurveCommand _ _ ) ->
+            sameRelation
+
+        ( SmoothQuadraticCurveCommand _ _, SmoothQuadraticCurveCommand _ _ ) ->
+            sameRelation
+
+        ( ArcCommand _ _, ArcCommand _ _ ) ->
+            sameRelation
+
+        ( CloseCommand _, CloseCommand _ ) ->
+            sameRelation
+
+        ( _, _ ) ->
+            False
+
+
 type alias UpdateBuilder =
     { selected : List Selection
     , offset : Point
     , lastEndPoint : Point
     , lastMovePoint : Point
     , lastControlPoint : Point
+    , lastCommand : Command
     , updatedComponents : List Component
     }
 
@@ -557,13 +658,71 @@ initUpdateBuilder selected offset =
     , lastEndPoint = Point.zero
     , lastMovePoint = Point.zero
     , lastControlPoint = Point.zero
+    , lastCommand =
+        { relation = Absolute
+        , commandType = CloseCommand { afterLetter = NoLetter }
+        }
     , updatedComponents = []
     }
 
 
-updateMove : Component -> BaseSegmentParameters -> Component
+type alias UpdateBaseParameters =
+    { from : Point
+    , to : Point
+    , lastCommand : Command
+    }
+
+
+type alias UpdateCubicCurveParameters =
+    { startControl : Point
+    , endControl : Point
+    , from : Point
+    , to : Point
+    , isSmooth : Bool
+    , lastCommand : Command
+    }
+
+
+type alias UpdateQuadraticCurveParameters =
+    { control : Point
+    , from : Point
+    , to : Point
+    , isSmooth : Bool
+    , lastCommand : Command
+    }
+
+
+type alias UpdateArcParameters =
+    { radii : Point
+    , angle : Float
+    , size : ArcSize
+    , rotation : ArcRotation
+    , from : Point
+    , to : Point
+    , lastCommand : Command
+    }
+
+
+type alias AnyFormat r =
+    { r | afterLetter : Separator }
+
+
+updateFormat : AnyFormat r -> Bool -> AnyFormat r
+updateFormat format inSequence =
+    if not inSequence && format.afterLetter == NoLetter then
+        { format | afterLetter = expandedLetterSeparator }
+
+    else
+        format
+
+
+updateMove : Component -> UpdateBaseParameters -> Component
 updateMove { command } params =
     let
+        inSequence : Bool
+        inSequence =
+            commandInSequence params.lastCommand command
+
         newCommand : Command
         newCommand =
             case ( command.relation, command.commandType ) of
@@ -572,7 +731,7 @@ updateMove { command } params =
                         | commandType =
                             MoveCommand
                                 { to = params.to }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 ( Relative, MoveCommand _ format ) ->
@@ -580,23 +739,33 @@ updateMove { command } params =
                         | commandType =
                             MoveCommand
                                 { to = Point.subtract params.to params.from }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 _ ->
                     command
     in
     { command = newCommand
-    , segment = MoveSegment params
+    , segment = MoveSegment { to = params.to, from = params.from }
     }
 
 
-updateLine : Component -> BaseSegmentParameters -> Component
+updateLine : Component -> UpdateBaseParameters -> Component
 updateLine { command } params =
     let
         newOffset : Point
         newOffset =
             Point.subtract params.to params.from
+
+        inSequence : Bool
+        inSequence =
+            commandInSequence params.lastCommand command
+
+        inSequenceExpansion : Bool
+        inSequenceExpansion =
+            commandInSequence
+                params.lastCommand
+                (defaultLineCommand command.relation)
 
         newCommand : Command
         newCommand =
@@ -606,7 +775,7 @@ updateLine { command } params =
                         | commandType =
                             LineCommand
                                 { to = params.to }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 ( Relative, LineCommand _ format ) ->
@@ -614,7 +783,7 @@ updateLine { command } params =
                         | commandType =
                             LineCommand
                                 { to = newOffset }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 ( Absolute, HorizontalLineCommand _ format ) ->
@@ -623,7 +792,7 @@ updateLine { command } params =
                             | commandType =
                                 HorizontalLineCommand
                                     { toX = params.to.x }
-                                    format
+                                    (updateFormat format inSequence)
                         }
 
                     else
@@ -631,7 +800,9 @@ updateLine { command } params =
                             | commandType =
                                 LineCommand
                                     { to = params.to }
-                                    (expandHorizontalFormat format)
+                                    (updateFormat format inSequenceExpansion
+                                        |> expandHorizontalFormat
+                                    )
                         }
 
                 ( Relative, HorizontalLineCommand _ format ) ->
@@ -640,7 +811,7 @@ updateLine { command } params =
                             | commandType =
                                 HorizontalLineCommand
                                     { toX = newOffset.x }
-                                    format
+                                    (updateFormat format inSequence)
                         }
 
                     else
@@ -648,7 +819,9 @@ updateLine { command } params =
                             | commandType =
                                 LineCommand
                                     { to = newOffset }
-                                    (expandHorizontalFormat format)
+                                    (updateFormat format inSequenceExpansion
+                                        |> expandHorizontalFormat
+                                    )
                         }
 
                 ( Absolute, VerticalLineCommand _ format ) ->
@@ -657,7 +830,7 @@ updateLine { command } params =
                             | commandType =
                                 VerticalLineCommand
                                     { toY = params.to.y }
-                                    format
+                                    (updateFormat format inSequence)
                         }
 
                     else
@@ -665,7 +838,9 @@ updateLine { command } params =
                             | commandType =
                                 LineCommand
                                     { to = params.to }
-                                    (expandVerticalFormat format)
+                                    (updateFormat format inSequenceExpansion
+                                        |> expandVerticalFormat
+                                    )
                         }
 
                 ( Relative, VerticalLineCommand _ format ) ->
@@ -674,7 +849,7 @@ updateLine { command } params =
                             | commandType =
                                 VerticalLineCommand
                                     { toY = newOffset.y }
-                                    format
+                                    (updateFormat format inSequence)
                         }
 
                     else
@@ -682,23 +857,16 @@ updateLine { command } params =
                             | commandType =
                                 LineCommand
                                     { to = newOffset }
-                                    (expandVerticalFormat format)
+                                    (updateFormat format inSequenceExpansion
+                                        |> expandVerticalFormat
+                                    )
                         }
 
                 _ ->
                     command
     in
     { command = newCommand
-    , segment = LineSegment params
-    }
-
-
-type alias UpdateCubicCurveParameters =
-    { from : Point
-    , startControl : Point
-    , endControl : Point
-    , to : Point
-    , isSmooth : Bool
+    , segment = LineSegment { to = params.to, from = params.from }
     }
 
 
@@ -717,6 +885,16 @@ updateCubicCurve { command } params =
         newOffset =
             Point.subtract params.to params.from
 
+        inSequence : Bool
+        inSequence =
+            commandInSequence params.lastCommand command
+
+        inSequenceExpansion : Bool
+        inSequenceExpansion =
+            commandInSequence
+                params.lastCommand
+                (defaultCubicCurveCommand command.relation)
+
         newCommand : Command
         newCommand =
             case ( command.relation, command.commandType ) of
@@ -728,7 +906,7 @@ updateCubicCurve { command } params =
                                 , endControl = params.endControl
                                 , to = params.to
                                 }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 ( Relative, CubicCurveCommand _ format ) ->
@@ -739,7 +917,7 @@ updateCubicCurve { command } params =
                                 , endControl = newEndControlOffset
                                 , to = newOffset
                                 }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 ( Absolute, SmoothCubicCurveCommand _ format ) ->
@@ -750,7 +928,7 @@ updateCubicCurve { command } params =
                                     { endControl = params.endControl
                                     , to = params.to
                                     }
-                                    format
+                                    (updateFormat format inSequence)
                         }
 
                     else
@@ -761,7 +939,9 @@ updateCubicCurve { command } params =
                                     , endControl = params.endControl
                                     , to = params.to
                                     }
-                                    (expandSmoothCubicFormat format)
+                                    (updateFormat format inSequenceExpansion
+                                        |> expandSmoothCubicFormat
+                                    )
                         }
 
                 ( Relative, SmoothCubicCurveCommand _ format ) ->
@@ -772,7 +952,7 @@ updateCubicCurve { command } params =
                                     { endControl = newEndControlOffset
                                     , to = newOffset
                                     }
-                                    format
+                                    (updateFormat format inSequence)
                         }
 
                     else
@@ -783,7 +963,9 @@ updateCubicCurve { command } params =
                                     , endControl = newEndControlOffset
                                     , to = newOffset
                                     }
-                                    (expandSmoothCubicFormat format)
+                                    (updateFormat format inSequenceExpansion
+                                        |> expandSmoothCubicFormat
+                                    )
                         }
 
                 _ ->
@@ -800,14 +982,6 @@ updateCubicCurve { command } params =
     }
 
 
-type alias UpdateQuadraticCurveParameters =
-    { control : Point
-    , from : Point
-    , to : Point
-    , isSmooth : Bool
-    }
-
-
 updateQuadraticCurve : Component -> UpdateQuadraticCurveParameters -> Component
 updateQuadraticCurve { command } params =
     let
@@ -819,6 +993,16 @@ updateQuadraticCurve { command } params =
         newOffset =
             Point.subtract params.to params.from
 
+        inSequence : Bool
+        inSequence =
+            commandInSequence params.lastCommand command
+
+        inSequenceExpansion : Bool
+        inSequenceExpansion =
+            commandInSequence
+                params.lastCommand
+                (defaultCubicCurveCommand command.relation)
+
         newCommand : Command
         newCommand =
             case ( command.relation, command.commandType ) of
@@ -829,7 +1013,7 @@ updateQuadraticCurve { command } params =
                                 { control = params.control
                                 , to = params.to
                                 }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 ( Relative, QuadraticCurveCommand _ format ) ->
@@ -839,7 +1023,7 @@ updateQuadraticCurve { command } params =
                                 { control = newControlOffset
                                 , to = newOffset
                                 }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 ( Absolute, SmoothQuadraticCurveCommand _ format ) ->
@@ -848,7 +1032,7 @@ updateQuadraticCurve { command } params =
                             | commandType =
                                 SmoothQuadraticCurveCommand
                                     { to = params.to }
-                                    format
+                                    (updateFormat format inSequence)
                         }
 
                     else
@@ -858,7 +1042,9 @@ updateQuadraticCurve { command } params =
                                     { control = params.control
                                     , to = params.to
                                     }
-                                    (expandSmoothQuadraticFormat format)
+                                    (updateFormat format inSequenceExpansion
+                                        |> expandSmoothQuadraticFormat
+                                    )
                         }
 
                 ( Relative, SmoothQuadraticCurveCommand _ format ) ->
@@ -867,7 +1053,7 @@ updateQuadraticCurve { command } params =
                             | commandType =
                                 SmoothQuadraticCurveCommand
                                     { to = newOffset }
-                                    format
+                                    (updateFormat format inSequence)
                         }
 
                     else
@@ -877,7 +1063,9 @@ updateQuadraticCurve { command } params =
                                     { control = newControlOffset
                                     , to = newOffset
                                     }
-                                    (expandSmoothQuadraticFormat format)
+                                    (updateFormat format inSequenceExpansion
+                                        |> expandSmoothQuadraticFormat
+                                    )
                         }
 
                 _ ->
@@ -893,9 +1081,13 @@ updateQuadraticCurve { command } params =
     }
 
 
-updateArc : Component -> ArcSegmentParameters -> Component
+updateArc : Component -> UpdateArcParameters -> Component
 updateArc { command } params =
     let
+        inSequence : Bool
+        inSequence =
+            commandInSequence params.lastCommand command
+
         newCommand : Command
         newCommand =
             case ( command.relation, command.commandType ) of
@@ -909,7 +1101,7 @@ updateArc { command } params =
                                 , rotation = params.rotation
                                 , to = params.to
                                 }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 ( Relative, ArcCommand _ format ) ->
@@ -922,14 +1114,22 @@ updateArc { command } params =
                                 , rotation = params.rotation
                                 , to = Point.subtract params.to params.from
                                 }
-                                format
+                                (updateFormat format inSequence)
                     }
 
                 _ ->
                     command
     in
     { command = newCommand
-    , segment = ArcSegment params
+    , segment =
+        ArcSegment
+            { radii = params.radii
+            , angle = params.angle
+            , size = params.size
+            , rotation = params.rotation
+            , from = params.from
+            , to = params.to
+            }
     }
 
 
@@ -963,7 +1163,7 @@ updateComponent ( index, component ) builder =
     case component.segment of
         MoveSegment params ->
             let
-                newParams : BaseSegmentParameters
+                newParams : UpdateBaseParameters
                 newParams =
                     { from = builder.lastEndPoint
                     , to =
@@ -972,6 +1172,7 @@ updateComponent ( index, component ) builder =
 
                         else
                             params.to
+                    , lastCommand = builder.lastCommand
                     }
 
                 updatedComponent : Component
@@ -982,13 +1183,14 @@ updateComponent ( index, component ) builder =
                 | lastEndPoint = newParams.to
                 , lastMovePoint = newParams.to
                 , lastControlPoint = newParams.to
+                , lastCommand = updatedComponent.command
                 , updatedComponents =
                     updatedComponent :: builder.updatedComponents
             }
 
         LineSegment params ->
             let
-                newParams : BaseSegmentParameters
+                newParams : UpdateBaseParameters
                 newParams =
                     { from = builder.lastEndPoint
                     , to =
@@ -997,6 +1199,7 @@ updateComponent ( index, component ) builder =
 
                         else
                             params.to
+                    , lastCommand = builder.lastCommand
                     }
 
                 updatedComponent : Component
@@ -1006,6 +1209,7 @@ updateComponent ( index, component ) builder =
             { builder
                 | lastEndPoint = newParams.to
                 , lastControlPoint = newParams.to
+                , lastCommand = updatedComponent.command
                 , updatedComponents =
                     updatedComponent :: builder.updatedComponents
             }
@@ -1038,6 +1242,7 @@ updateComponent ( index, component ) builder =
                             params.from
                             params.startControl
                             builder.lastControlPoint
+                    , lastCommand = builder.lastCommand
                     }
 
                 updatedComponent : Component
@@ -1047,6 +1252,7 @@ updateComponent ( index, component ) builder =
             { builder
                 | lastEndPoint = newParams.to
                 , lastControlPoint = newParams.endControl
+                , lastCommand = updatedComponent.command
                 , updatedComponents =
                     updatedComponent :: builder.updatedComponents
             }
@@ -1073,6 +1279,7 @@ updateComponent ( index, component ) builder =
                             params.from
                             params.control
                             builder.lastControlPoint
+                    , lastCommand = builder.lastCommand
                     }
 
                 updatedComponent : Component
@@ -1082,13 +1289,14 @@ updateComponent ( index, component ) builder =
             { builder
                 | lastEndPoint = newParams.to
                 , lastControlPoint = newParams.control
+                , lastCommand = updatedComponent.command
                 , updatedComponents =
                     updatedComponent :: builder.updatedComponents
             }
 
         ArcSegment params ->
             let
-                newParams : ArcSegmentParameters
+                newParams : UpdateArcParameters
                 newParams =
                     { radii = params.radii
                     , angle = params.angle
@@ -1101,6 +1309,7 @@ updateComponent ( index, component ) builder =
 
                         else
                             params.to
+                    , lastCommand = builder.lastCommand
                     }
 
                 updatedComponent : Component
@@ -1110,6 +1319,7 @@ updateComponent ( index, component ) builder =
             { builder
                 | lastEndPoint = newParams.to
                 , lastControlPoint = newParams.to
+                , lastCommand = updatedComponent.command
                 , updatedComponents =
                     updatedComponent :: builder.updatedComponents
             }
@@ -1129,6 +1339,7 @@ updateComponent ( index, component ) builder =
             { builder
                 | lastEndPoint = builder.lastMovePoint
                 , lastControlPoint = builder.lastMovePoint
+                , lastCommand = updatedComponent.command
                 , updatedComponents =
                     updatedComponent :: builder.updatedComponents
             }
