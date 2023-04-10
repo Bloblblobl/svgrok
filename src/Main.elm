@@ -34,11 +34,10 @@ main =
 type alias Model =
     { pathString : String
     , path : Path
-    , mouseOffset : Maybe Point
-    , mouseOverOverlay : Bool
-    , mouseDown : Maybe Point
     , overlayConfig : Canvas.OverlayConfig
     , viewBox : ViewBox
+    , mouseOffset : Point
+    , state : Canvas.State
     }
 
 
@@ -61,11 +60,10 @@ initModel : Model
 initModel =
     { pathString = ""
     , path = Path.init
-    , mouseOffset = Nothing
-    , mouseOverOverlay = False
-    , mouseDown = Nothing
     , overlayConfig = Canvas.initOverlayConfig
     , viewBox = ViewBox.init
+    , mouseOffset = Point.zero
+    , state = Canvas.Neutral
     }
 
 
@@ -123,25 +121,13 @@ decodeMouseOffset =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
-    (if model.mouseOverOverlay then
-        [ BrowserE.onMouseMove <|
-            JsonD.map (CanvasMsg << Canvas.MouseMove) decodeMouseOffset
-        , BrowserE.onMouseDown <|
-            JsonD.map (CanvasMsg << Canvas.MouseDown) decodeMouseOffset
-        , BrowserE.onMouseUp (JsonD.succeed (CanvasMsg Canvas.MouseUp))
-        , BrowserE.onResize WindowResized
-        ]
-
-     else if model.mouseDown /= Nothing then
-        [ BrowserE.onMouseUp (JsonD.succeed (CanvasMsg Canvas.MouseUp))
-        , BrowserE.onResize WindowResized
-        ]
-
-     else
-        [ BrowserE.onResize WindowResized
-        ]
-    )
+subscriptions _ =
+    [ BrowserE.onMouseMove <|
+        JsonD.map (CanvasMsg << Canvas.MouseMove) decodeMouseOffset
+    , BrowserE.onMouseDown (JsonD.succeed (CanvasMsg Canvas.MouseDown))
+    , BrowserE.onMouseUp (JsonD.succeed (CanvasMsg Canvas.MouseUp))
+    , BrowserE.onResize WindowResized
+    ]
         |> Sub.batch
 
 
@@ -169,6 +155,13 @@ view model =
     Html.div [] [ canvas, viewUI model ]
 
 
+viewState : Canvas.State -> Point -> Html Msg
+viewState state offset =
+    Html.p
+        [ HtmlA.style "padding-left" "10px" ]
+        [ Html.text <| Canvas.stateToString state ++ Point.toString offset ]
+
+
 viewUI : Model -> Html Msg
 viewUI model =
     Html.div
@@ -178,21 +171,8 @@ viewUI model =
         , HtmlA.style "width" "100%"
         , HtmlA.style "bottom" "0"
         ]
-        [ Html.p [ HtmlA.style "padding-left" "10px" ]
-            [ Html.text
-                (Point.toString
-                    (Maybe.withDefault Point.zero model.mouseOffset)
-                )
-            ]
-        , Html.p [ HtmlA.style "padding-left" "10px" ]
-            [ Html.text <| "over: " ++ stringFromBool model.mouseOverOverlay ]
-        , Html.p [ HtmlA.style "padding-left" "10px" ]
-            [ Html.text <|
-                "down: "
-                    ++ Point.toString
-                        (Maybe.withDefault Point.zero model.mouseDown)
-            ]
-        , viewViewBoxSize model.viewBox
+        [ viewViewBoxSize model.viewBox
+        , viewState model.state model.mouseOffset
         , viewPathStringInput model.pathString
         ]
 

@@ -1600,3 +1600,22 @@ toString { components } =
             commandString ++ commandToString command
     in
     List.foldl step "" components
+
+
+selectionToString : Selection -> String
+selectionToString { index, element } =
+    case element of
+        EndPoint ->
+            "EndPoint " ++ String.fromInt index
+
+        StartControl ->
+            "StartControl " ++ String.fromInt index
+
+        EndControl ->
+            "EndControl " ++ String.fromInt index
+
+        Control ->
+            "Control " ++ String.fromInt index
+
+        Segment ->
+            "Segment " ++ String.fromInt index
