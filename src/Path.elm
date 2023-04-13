@@ -563,6 +563,34 @@ buildComponents commands =
 ----------------------
 
 
+addSelection : Path -> Selection -> Path
+addSelection path selection =
+    if List.member selection path.selected then
+        path
+
+    else
+        { path | selected = selection :: path.selected }
+
+
+removeSelection : Path -> Selection -> Path
+removeSelection path selection =
+    let
+        removedFromSelected : List Selection
+        removedFromSelected =
+            List.filter (\s -> s /= selection) path.selected
+    in
+    { path | selected = removedFromSelected }
+
+
+toggleSelection : Path -> Selection -> Path
+toggleSelection path selection =
+    if List.member selection path.selected then
+        removeSelection path selection
+
+    else
+        addSelection path selection
+
+
 defaultPointSeparator : PointSeparator
 defaultPointSeparator =
     { x = Spaces 0, y = Spaces 0 }
@@ -1382,6 +1410,11 @@ update path offset =
             List.reverse updatedBuilder.updatedComponents
     in
     { path | components = updatedComponents }
+
+
+updateWithSelection : Path -> Point -> Selection -> Path
+updateWithSelection path offset selection =
+    removeSelection (update (addSelection path selection) offset) selection
 
 
 

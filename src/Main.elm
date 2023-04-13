@@ -13,6 +13,7 @@ import Path.Parser
 import Point exposing (Point)
 import Svg exposing (Svg)
 import Task
+import Time
 import ViewBox exposing (ViewBox)
 
 
@@ -121,14 +122,26 @@ decodeMouseOffset =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    [ BrowserE.onMouseMove <|
-        JsonD.map (CanvasMsg << Canvas.MouseMove) decodeMouseOffset
-    , BrowserE.onMouseDown (JsonD.succeed (CanvasMsg Canvas.MouseDown))
-    , BrowserE.onMouseUp (JsonD.succeed (CanvasMsg Canvas.MouseUp))
-    , BrowserE.onResize WindowResized
-    ]
-        |> Sub.batch
+subscriptions model =
+    let
+        baseSubscriptions : List (Sub Msg)
+        baseSubscriptions =
+            [ BrowserE.onMouseMove <|
+                JsonD.map (CanvasMsg << Canvas.MouseMove) decodeMouseOffset
+            , BrowserE.onMouseDown (JsonD.succeed (CanvasMsg Canvas.MouseDown))
+            , BrowserE.onMouseUp (JsonD.succeed (CanvasMsg Canvas.MouseUp))
+            , BrowserE.onResize WindowResized
+            ]
+    in
+    case model.state of
+        Canvas.Clicking _ ->
+            Time.every 100 (\_ -> CanvasMsg Canvas.StartDrag)
+                :: baseSubscriptions
+                |> Sub.batch
+
+        _ ->
+            baseSubscriptions
+                |> Sub.batch
 
 
 stringFromBool : Bool -> String
@@ -147,20 +160,11 @@ view model =
         ghost =
             case model.state of
                 Canvas.Dragging { dragStart, temporarySelection } ->
-                    case temporarySelection of
-                        Just selection ->
-                            Just
-                                (Path.update
-                                    (Canvas.addSelection model.path selection)
-                                    (Point.subtract model.mouseOffset dragStart)
-                                )
-
-                        Nothing ->
-                            Just
-                                (Path.update
-                                    model.path
-                                    (Point.subtract model.mouseOffset dragStart)
-                                )
+                    Just
+                        (Path.update
+                            (Path.addSelection model.path temporarySelection)
+                            (Point.subtract model.mouseOffset dragStart)
+                        )
 
                 _ ->
                     Nothing

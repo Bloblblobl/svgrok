@@ -11,7 +11,8 @@ import ViewBox exposing (ViewBox)
 
 type State
     = Neutral
-    | Dragging { dragStart : Point, temporarySelection : Maybe Path.Selection }
+    | Clicking { position : Point, temporarySelection : Path.Selection }
+    | Dragging { dragStart : Point, temporarySelection : Path.Selection }
 
 
 stateToString : State -> String
@@ -20,23 +21,23 @@ stateToString state =
         Neutral ->
             "Neutral: "
 
-        Dragging { dragStart, temporarySelection } ->
-            case temporarySelection of
-                Just selection ->
-                    String.concat
-                        [ "Dragging: "
-                        , Point.toString dragStart
-                        , " -> "
-                        , Path.selectionToString selection
-                        , " | "
-                        ]
+        Clicking { position, temporarySelection } ->
+            String.concat
+                [ "Clicking: "
+                , Point.toString position
+                , " -> "
+                , Path.selectionToString temporarySelection
+                , " | "
+                ]
 
-                Nothing ->
-                    String.concat
-                        [ "Dragging: "
-                        , Point.toString dragStart
-                        , " -> "
-                        ]
+        Dragging { dragStart, temporarySelection } ->
+            String.concat
+                [ "Dragging: "
+                , Point.toString dragStart
+                , " -> "
+                , Path.selectionToString temporarySelection
+                , " | "
+                ]
 
 
 type alias PartialModel r =
@@ -51,40 +52,12 @@ type alias PartialModel r =
 
 type Msg
     = SetHoveredElement (Maybe Path.Selection)
-    | ToggleSelection Path.Selection
     | ClearSelections
     | MouseMove Point
     | MouseDown
     | MouseDownElement Path.Selection
     | MouseUp
-
-
-addSelection : Path -> Path.Selection -> Path
-addSelection path selection =
-    if List.member selection path.selected then
-        path
-
-    else
-        { path | selected = selection :: path.selected }
-
-
-removeSelection : Path -> Path.Selection -> Path
-removeSelection path selection =
-    let
-        removedFromSelected : List Path.Selection
-        removedFromSelected =
-            List.filter (\s -> s /= selection) path.selected
-    in
-    { path | selected = removedFromSelected }
-
-
-toggleSelection : Path -> Path.Selection -> Path
-toggleSelection path selection =
-    if List.member selection path.selected then
-        removeSelection path selection
-
-    else
-        addSelection path selection
+    | StartDrag
 
 
 update : Msg -> PartialModel r -> PartialModel r
@@ -97,15 +70,7 @@ update msg model =
             in
             { model | path = { path | hovered = selection } }
 
-        ToggleSelection selection ->
-            { model | path = toggleSelection model.path selection }
-
         ClearSelections ->
-            let
-                test : String
-                test =
-                    Debug.log "click" ""
-            in
             { model
                 | path =
                     { components = model.path.components
@@ -125,11 +90,14 @@ update msg model =
                 Neutral ->
                     { model
                         | state =
-                            Dragging
-                                { dragStart = model.mouseOffset
-                                , temporarySelection = Just selection
+                            Clicking
+                                { position = model.mouseOffset
+                                , temporarySelection = selection
                                 }
                     }
+
+                Clicking _ ->
+                    model
 
                 Dragging _ ->
                     model
@@ -139,22 +107,34 @@ update msg model =
                 Neutral ->
                     model
 
+                Clicking { temporarySelection } ->
+                    let
+                        newPath : Path
+                        newPath =
+                            Path.toggleSelection model.path temporarySelection
+                    in
+                    { model | path = newPath, state = Neutral }
+
                 Dragging { dragStart, temporarySelection } ->
                     let
                         dragOffset : Point
                         dragOffset =
                             Point.subtract model.mouseOffset dragStart
 
+                        alreadySelected : Bool
+                        alreadySelected =
+                            List.member temporarySelection model.path.selected
+
                         newPath : Path
                         newPath =
-                            case temporarySelection of
-                                Just selection ->
-                                    Path.update
-                                        (addSelection model.path selection)
-                                        dragOffset
+                            if Debug.log "selected" alreadySelected then
+                                Path.update model.path dragOffset
 
-                                Nothing ->
-                                    Path.update model.path dragOffset
+                            else
+                                Path.updateWithSelection
+                                    model.path
+                                    dragOffset
+                                    temporarySelection
 
                         newPathString : String
                         newPathString =
@@ -165,6 +145,20 @@ update msg model =
                         , pathString = newPathString
                         , state = Neutral
                     }
+
+        StartDrag ->
+            case model.state of
+                Clicking { position, temporarySelection } ->
+                    { model
+                        | state =
+                            Dragging
+                                { dragStart = position
+                                , temporarySelection = temporarySelection
+                                }
+                    }
+
+                _ ->
+                    model
 
 
 type alias OverlayConfig =
@@ -242,7 +236,6 @@ selectionMouseEvents : Path.Selection -> List (Attribute Msg)
 selectionMouseEvents selection =
     [ SvgE.onMouseOver (SetHoveredElement <| Just selection)
     , SvgE.onMouseOut (SetHoveredElement Nothing)
-    , SvgE.onClick (ToggleSelection selection)
     , SvgE.onMouseDown (MouseDownElement selection)
     ]
 
