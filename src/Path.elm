@@ -470,7 +470,10 @@ buildComponent command componentBuilder =
 
                 SmoothCubicCurveCommand { endControl, to } _ ->
                     CubicCurveSegment
-                        { startControl = previousControl
+                        { startControl =
+                            Point.reflectOver
+                                currentPoint
+                                previousControl
                         , endControl = absolute endControl
                         , from = currentPoint
                         , to = absolute to
@@ -485,7 +488,10 @@ buildComponent command componentBuilder =
 
                 SmoothQuadraticCurveCommand { to } _ ->
                     QuadraticCurveSegment
-                        { control = previousControl
+                        { control =
+                            Point.reflectOver
+                                currentPoint
+                                previousControl
                         , from = currentPoint
                         , to = absolute to
                         }
