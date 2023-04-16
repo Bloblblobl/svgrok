@@ -323,8 +323,8 @@ update msg model =
 decodeMouseOffset : JsonD.Decoder Point
 decodeMouseOffset =
     JsonD.map2 Point
-        (JsonD.field "offsetX" JsonD.float)
-        (JsonD.field "offsetY" JsonD.float)
+        (JsonD.field "clientX" JsonD.float)
+        (JsonD.field "clientY" JsonD.float)
 
 
 subscriptions : Model -> Sub Msg
