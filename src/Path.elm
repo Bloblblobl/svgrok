@@ -1,6 +1,5 @@
 module Path exposing (..)
 
-import Old.Path exposing (CommandType(..))
 import Point exposing (Point)
 
 

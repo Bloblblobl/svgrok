@@ -10,12 +10,6 @@ type alias Point =
     { x : Float, y : Float }
 
 
-{-| TODO: remove when removing Old.
--}
-type alias Pair =
-    { start : Point, end : Point }
-
-
 {-| Point zero, AKA the origin.
 -}
 zero : Point
@@ -69,19 +63,6 @@ comma.
 toString : Point -> String
 toString point =
     String.fromFloat point.x ++ "," ++ String.fromFloat point.y
-
-
-{-| TODO: remove when removing Old.
--}
-pairToString : Pair -> String
-pairToString { start, end } =
-    String.concat
-        [ "{ start: ("
-        , toString start
-        , "), end: ("
-        , toString end
-        , ") }"
-        ]
 
 
 {-| Finds the midpoint between the two given Points.
