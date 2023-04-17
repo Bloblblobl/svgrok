@@ -7,6 +7,8 @@ import Html exposing (Html)
 import Html.Attributes as HtmlA
 import Html.Events as HtmlE
 import Json.Decode as JsonD
+import Keyboard.Event exposing (KeyboardEvent, decodeKeyboardEvent)
+import Keyboard.Key exposing (Key(..))
 import Path exposing (Path)
 import Path.Parser
 import Point exposing (Point)
@@ -33,7 +35,11 @@ type alias OverlayConfig =
 
 type State
     = Neutral
-    | Clicking { position : Point, temporarySelection : Path.Selection, canDrag : Bool }
+    | Clicking
+        { position : Point
+        , temporarySelection : Path.Selection
+        , canDrag : Bool
+        }
     | Dragging { dragStart : Point, temporarySelection : Path.Selection }
 
 
@@ -44,6 +50,11 @@ type alias Model =
     , viewBox : ViewBox
     , mouseOffset : Point
     , state : State
+    , activeKeys : List Key
+
+    -- special flag for when the meta key is pressed,
+    -- as it messes with key event handling
+    , metaPressed : Bool
     }
 
 
@@ -117,6 +128,8 @@ initModel =
     , viewBox = ViewBox.init
     , mouseOffset = Point.zero
     , state = Neutral
+    , activeKeys = []
+    , metaPressed = False
     }
 
 
@@ -150,6 +163,32 @@ type Msg
     | MouseDownElement Path.Selection
     | MouseUp
     | SetCanDrag
+    | SetActiveKey KeyboardEvent
+    | UnsetActiveKey KeyboardEvent
+
+
+trackedKey : Key -> Bool
+trackedKey key =
+    case key of
+        Shift _ ->
+            True
+
+        _ ->
+            False
+
+
+setActiveKey : Key -> Model -> Model
+setActiveKey key model =
+    if List.member key model.activeKeys || not (trackedKey key) then
+        model
+
+    else
+        { model | activeKeys = key :: model.activeKeys }
+
+
+unsetActiveKey : Key -> Model -> Model
+unsetActiveKey key model =
+    { model | activeKeys = List.filter ((/=) key) model.activeKeys }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -313,6 +352,26 @@ update msg model =
                 Dragging _ ->
                     ( model, Cmd.none )
 
+        SetActiveKey { keyCode } ->
+            case keyCode of
+                Ambiguous _ ->
+                    ( { model | metaPressed = True }, Cmd.none )
+
+                _ ->
+                    if not model.metaPressed then
+                        ( setActiveKey keyCode model, Cmd.none )
+
+                    else
+                        ( model, Cmd.none )
+
+        UnsetActiveKey { keyCode } ->
+            case keyCode of
+                Ambiguous _ ->
+                    ( { model | metaPressed = False }, Cmd.none )
+
+                _ ->
+                    ( unsetActiveKey keyCode model, Cmd.none )
+
 
 
 -------------------
@@ -334,6 +393,8 @@ subscriptions model =
         baseSubscriptions =
             [ BrowserE.onMouseMove (JsonD.map MouseMove decodeMouseOffset)
             , BrowserE.onMouseUp (JsonD.succeed MouseUp)
+            , BrowserE.onKeyDown (JsonD.map SetActiveKey decodeKeyboardEvent)
+            , BrowserE.onKeyUp (JsonD.map UnsetActiveKey decodeKeyboardEvent)
             , BrowserE.onResize WindowResized
             ]
     in
