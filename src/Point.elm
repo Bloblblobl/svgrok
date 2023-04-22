@@ -85,3 +85,28 @@ isReflectionOver reflection point1 point2 =
 reflectOver : Point -> Point -> Point
 reflectOver reflection point =
     add reflection (subtract reflection point)
+
+
+{-| Returns whether a given Point is within a bounding box described by two
+other Points.
+-}
+withinBounds : Point -> Point -> Point -> Bool
+withinBounds point bounds1 bounds2 =
+    let
+        minX : Float
+        minX =
+            min bounds1.x bounds2.x
+
+        maxX : Float
+        maxX =
+            max bounds1.x bounds2.x
+
+        minY : Float
+        minY =
+            min bounds1.y bounds2.y
+
+        maxY : Float
+        maxY =
+            max bounds1.y bounds2.y
+    in
+    minX <= point.x && point.x <= maxX && minY <= point.y && point.y <= maxY

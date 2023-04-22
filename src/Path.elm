@@ -1,6 +1,6 @@
 module Path exposing (..)
 
-import Point exposing (Point)
+import Point exposing (Point, withinBounds)
 
 
 
@@ -332,6 +332,88 @@ componentEndpoint component =
 
         CloseSegment { to } ->
             to
+
+
+selectionsWithin : Point -> Point -> Path -> List Selection
+selectionsWithin bounds1 bounds2 path =
+    List.concatMap
+        (\( index, component ) ->
+            componentSelectionsWithin bounds1 bounds2 index component
+        )
+        (List.indexedMap Tuple.pair path.components)
+
+
+{-| Returns a list of Selections for a given Component that are within a
+bounding box described by two Points.
+-}
+componentSelectionsWithin : Point -> Point -> Int -> Component -> List Selection
+componentSelectionsWithin bounds1 bounds2 index component =
+    let
+        withinBounds : Point -> Bool
+        withinBounds point =
+            Point.withinBounds point bounds1 bounds2
+    in
+    case component.segment of
+        MoveSegment { to } ->
+            if withinBounds to then
+                [ { index = index, element = EndPoint } ]
+
+            else
+                []
+
+        LineSegment { to } ->
+            if withinBounds to then
+                [ { index = index, element = EndPoint } ]
+
+            else
+                []
+
+        CubicCurveSegment { startControl, endControl, to } ->
+            List.concat
+                [ if withinBounds startControl then
+                    [ { index = index, element = StartControl } ]
+
+                  else
+                    []
+                , if withinBounds endControl then
+                    [ { index = index, element = EndControl } ]
+
+                  else
+                    []
+                , if withinBounds to then
+                    [ { index = index, element = EndPoint } ]
+
+                  else
+                    []
+                ]
+
+        QuadraticCurveSegment { control, to } ->
+            List.concat
+                [ if withinBounds control then
+                    [ { index = index, element = Control } ]
+
+                  else
+                    []
+                , if withinBounds to then
+                    [ { index = index, element = EndPoint } ]
+
+                  else
+                    []
+                ]
+
+        ArcSegment { to } ->
+            if withinBounds to then
+                [ { index = index, element = EndPoint } ]
+
+            else
+                []
+
+        CloseSegment { to } ->
+            if withinBounds to then
+                [ { index = index, element = EndPoint } ]
+
+            else
+                []
 
 
 

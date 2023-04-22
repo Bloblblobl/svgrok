@@ -41,6 +41,7 @@ type State
         , canDrag : Bool
         }
     | Dragging { dragStart : Point, temporarySelection : Path.Selection }
+    | Selecting Point
 
 
 type alias Model =
@@ -156,11 +157,9 @@ type Msg
     | PathStringChanged String
     | WindowResized Int Int
     | SetHoveredElement (Maybe Path.Selection)
-    | ClearSelections
     | MouseMove Point
-      -- TODO: MouseDownCanvas to handle selection box, panning, etc.
-      -- | MouseDownCanvas
     | MouseDownElement Path.Selection
+    | MouseDownCanvas
     | MouseUp
     | SetCanDrag
     | SetActiveKey KeyboardEvent
@@ -189,6 +188,20 @@ setActiveKey key model =
 unsetActiveKey : Key -> Model -> Model
 unsetActiveKey key model =
     { model | activeKeys = List.filter ((/=) key) model.activeKeys }
+
+
+shiftPressed : Model -> Bool
+shiftPressed model =
+    List.any
+        (\key ->
+            case key of
+                Shift _ ->
+                    True
+
+                _ ->
+                    False
+        )
+        model.activeKeys
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -230,17 +243,6 @@ update msg model =
             , Cmd.none
             )
 
-        ClearSelections ->
-            ( { model
-                | path =
-                    { components = model.path.components
-                    , hovered = model.path.hovered
-                    , selected = []
-                    }
-              }
-            , Cmd.none
-            )
-
         MouseMove newOffset ->
             let
                 newState : State
@@ -260,6 +262,9 @@ update msg model =
                                 model.state
 
                         Dragging _ ->
+                            model.state
+
+                        Selecting _ ->
                             model.state
             in
             ( { model
@@ -289,6 +294,37 @@ update msg model =
                 Dragging _ ->
                     ( model, Cmd.none )
 
+                Selecting _ ->
+                    ( model, Cmd.none )
+
+        MouseDownCanvas ->
+            case model.state of
+                Neutral ->
+                    if shiftPressed model then
+                        ( { model | state = Selecting model.mouseOffset }
+                        , Cmd.none
+                        )
+
+                    else
+                        ( { model
+                            | path =
+                                { components = model.path.components
+                                , hovered = model.path.hovered
+                                , selected = []
+                                }
+                          }
+                        , Cmd.none
+                        )
+
+                Clicking _ ->
+                    ( model, Cmd.none )
+
+                Dragging _ ->
+                    ( model, Cmd.none )
+
+                Selecting _ ->
+                    ( model, Cmd.none )
+
         MouseUp ->
             case model.state of
                 Neutral ->
@@ -298,7 +334,24 @@ update msg model =
                     let
                         newPath : Path
                         newPath =
-                            Path.toggleSelection model.path temporarySelection
+                            if shiftPressed model then
+                                Path.toggleSelection
+                                    model.path
+                                    temporarySelection
+
+                            else
+                                { components = model.path.components
+                                , hovered = model.path.hovered
+                                , selected =
+                                    if
+                                        List.member temporarySelection
+                                            model.path.selected
+                                    then
+                                        []
+
+                                    else
+                                        [ temporarySelection ]
+                                }
                     in
                     ( { model | path = newPath, state = Neutral }, Cmd.none )
 
@@ -335,6 +388,22 @@ update msg model =
                     , Cmd.none
                     )
 
+                Selecting selectStart ->
+                    ( { model
+                        | path =
+                            { components = model.path.components
+                            , hovered = model.path.hovered
+                            , selected =
+                                Path.selectionsWithin
+                                    selectStart
+                                    model.mouseOffset
+                                    model.path
+                            }
+                        , state = Neutral
+                      }
+                    , Cmd.none
+                    )
+
         SetCanDrag ->
             case model.state of
                 Neutral ->
@@ -350,6 +419,9 @@ update msg model =
                     )
 
                 Dragging _ ->
+                    ( model, Cmd.none )
+
+                Selecting _ ->
                     ( model, Cmd.none )
 
         SetActiveKey { keyCode } ->
@@ -414,6 +486,10 @@ subscriptions model =
                     |> Sub.batch
 
         Dragging _ ->
+            baseSubscriptions
+                |> Sub.batch
+
+        Selecting _ ->
             baseSubscriptions
                 |> Sub.batch
 
@@ -716,8 +792,15 @@ viewSelectedPoints path =
     List.map viewSelectedPoint selectedPoints
 
 
-viewGhost : Path -> Svg Msg
-viewGhost path =
+viewGhost : Model -> Point -> Path.Selection -> Svg Msg
+viewGhost model dragStart temporarySelection =
+    let
+        ghostPath : Path
+        ghostPath =
+            Path.update
+                (Path.addSelection model.path temporarySelection)
+                (Point.subtract model.mouseOffset dragStart)
+    in
     Svg.g
         [ SvgA.fill "none"
         , SvgA.stroke "black"
@@ -726,7 +809,41 @@ viewGhost path =
         , SvgA.opacity "0.5"
         , SvgA.cursor "grab"
         ]
-        (viewPath [] (Path.toString path) :: viewSelectedPoints path)
+        (viewPath [] (Path.toString ghostPath) :: viewSelectedPoints ghostPath)
+
+
+viewSelectionBox : Point -> Point -> Svg Msg
+viewSelectionBox bounds1 bounds2 =
+    let
+        minX : Float
+        minX =
+            min bounds1.x bounds2.x
+
+        width : Float
+        width =
+            max bounds1.x bounds2.x - minX
+
+        minY : Float
+        minY =
+            min bounds1.y bounds2.y
+
+        height : Float
+        height =
+            max bounds1.y bounds2.y - minY
+    in
+    Svg.rect
+        [ SvgA.fill "black"
+        , SvgA.stroke "black"
+        , SvgA.strokeWidth "0.5"
+        , SvgA.strokeDasharray "0.5 0.5"
+        , SvgA.fillOpacity "0.05"
+        , SvgA.strokeOpacity "0.5"
+        , SvgA.x (String.fromFloat minX)
+        , SvgA.y (String.fromFloat minY)
+        , SvgA.width (String.fromFloat width)
+        , SvgA.height (String.fromFloat height)
+        ]
+        []
 
 
 viewBackground : Svg Msg
@@ -737,7 +854,7 @@ viewBackground =
         , SvgA.width "100%"
         , SvgA.height "100%"
         , SvgA.fill "transparent"
-        , SvgE.onClick ClearSelections
+        , SvgE.onMouseDown MouseDownCanvas
         ]
         []
 
@@ -745,20 +862,33 @@ viewBackground =
 {-| Renders a Path as a single SVG element as well as an overlay above it to
 interact with the Path.
 -}
-viewCanvas : ViewBox -> OverlayConfig -> Path -> Maybe Path -> Svg Msg
-viewCanvas viewBox config path ghost =
+viewCanvas : Model -> Svg Msg
+viewCanvas model =
     let
+        baseOverlay : List (Svg Msg)
+        baseOverlay =
+            viewOverlay model.overlayConfig model.path
+
         overlay : List (Svg Msg)
         overlay =
-            case ghost of
-                Just ghostPath ->
-                    viewGhost ghostPath :: viewOverlay config path
+            case model.state of
+                Neutral ->
+                    baseOverlay
 
-                Nothing ->
-                    viewOverlay config path
+                Clicking _ ->
+                    baseOverlay
+
+                Dragging { dragStart, temporarySelection } ->
+                    viewGhost model dragStart temporarySelection :: baseOverlay
+
+                Selecting selectionStart ->
+                    viewSelectionBox
+                        selectionStart
+                        model.mouseOffset
+                        :: baseOverlay
     in
     Svg.svg
-        [ SvgA.viewBox (ViewBox.toString viewBox)
+        [ SvgA.viewBox (ViewBox.toString model.viewBox)
         , SvgA.width "100vw"
         , SvgA.height "100vh"
         , SvgA.display "block"
@@ -798,6 +928,13 @@ stateToString state =
                 , Point.toString dragStart
                 , " -> "
                 , Path.selectionToString temporarySelection
+                , " | "
+                ]
+
+        Selecting selectionStart ->
+            String.concat
+                [ "Selecting: "
+                , Point.toString selectionStart
                 , " | "
                 ]
 
@@ -855,32 +992,7 @@ viewUI model =
 
 view : Model -> Html Msg
 view model =
-    let
-        ghost : Maybe Path
-        ghost =
-            case model.state of
-                Neutral ->
-                    Nothing
-
-                Clicking _ ->
-                    Nothing
-
-                Dragging { dragStart, temporarySelection } ->
-                    Just
-                        (Path.update
-                            (Path.addSelection model.path temporarySelection)
-                            (Point.subtract model.mouseOffset dragStart)
-                        )
-
-        canvas : Svg Msg
-        canvas =
-            viewCanvas
-                model.viewBox
-                model.overlayConfig
-                model.path
-                ghost
-    in
-    Html.div [] [ canvas, viewUI model ]
+    Html.div [] [ viewCanvas model, viewUI model ]
 
 
 
