@@ -44,6 +44,12 @@ type State
     | Selecting Point
 
 
+type alias SavedModel =
+    { pathString : String
+    , path : Path
+    }
+
+
 type alias Model =
     { pathString : String
     , path : Path
@@ -56,6 +62,8 @@ type alias Model =
     -- special flag for when the meta key is pressed,
     -- as it messes with key event handling
     , metaPressed : Bool
+    , undoStack : List SavedModel
+    , redoStack : List SavedModel
     }
 
 
@@ -131,6 +139,8 @@ initModel =
     , state = Neutral
     , activeKeys = []
     , metaPressed = False
+    , undoStack = []
+    , redoStack = []
     }
 
 
@@ -162,8 +172,10 @@ type Msg
     | MouseDownCanvas
     | MouseUp
     | SetCanDrag
-    | SetActiveKey KeyboardEvent
-    | UnsetActiveKey KeyboardEvent
+    | KeyDown KeyboardEvent
+    | KeyUp KeyboardEvent
+    | Undo
+    | Redo
 
 
 trackedKey : Key -> Bool
@@ -204,17 +216,134 @@ shiftPressed model =
         model.activeKeys
 
 
+shouldSave : SavedModel -> SavedModel -> Bool
+shouldSave oldSavedModel newSavedModel =
+    let
+        oldSegments : List Path.Segment
+        oldSegments =
+            List.map .segment oldSavedModel.path.components
+
+        newSegments : List Path.Segment
+        newSegments =
+            List.map .segment newSavedModel.path.components
+    in
+    oldSegments /= newSegments
+
+
+savePath : Path -> Path
+savePath path =
+    { path
+        | hovered = Nothing
+        , selected = []
+    }
+
+
+saveModel : Model -> Model -> Model
+saveModel oldModel newModel =
+    let
+        oldSavedModel : SavedModel
+        oldSavedModel =
+            { pathString = oldModel.pathString
+            , path = savePath oldModel.path
+            }
+
+        newSavedModel : SavedModel
+        newSavedModel =
+            { pathString = newModel.pathString
+            , path = savePath newModel.path
+            }
+    in
+    case List.head newModel.undoStack of
+        Just _ ->
+            if shouldSave oldSavedModel newSavedModel then
+                { newModel
+                    | undoStack = oldSavedModel :: newModel.undoStack
+                    , redoStack = []
+                }
+
+            else
+                newModel
+
+        Nothing ->
+            if shouldSave oldSavedModel newSavedModel then
+                { newModel
+                    | undoStack = [ oldSavedModel ]
+                    , redoStack = []
+                }
+
+            else
+                newModel
+
+
+undo : Model -> Model
+undo model =
+    let
+        currentSavedModel : SavedModel
+        currentSavedModel =
+            { pathString = model.pathString
+            , path = savePath model.path
+            }
+    in
+    case List.head model.undoStack of
+        Just savedModel ->
+            { model
+                | pathString = savedModel.pathString
+                , path =
+                    { components = savedModel.path.components
+                    , hovered = Nothing
+                    , selected = savedModel.path.selected
+                    }
+                , undoStack = List.drop 1 model.undoStack
+                , redoStack = currentSavedModel :: model.redoStack
+            }
+
+        Nothing ->
+            model
+
+
+redo : Model -> Model
+redo model =
+    let
+        currentSavedModel : SavedModel
+        currentSavedModel =
+            { pathString = model.pathString
+            , path = savePath model.path
+            }
+    in
+    case List.head model.redoStack of
+        Just savedModel ->
+            { model
+                | pathString = savedModel.pathString
+                , path =
+                    { components = savedModel.path.components
+                    , hovered = Nothing
+                    , selected = savedModel.path.selected
+                    }
+                , undoStack = currentSavedModel :: model.undoStack
+                , redoStack = List.drop 1 model.redoStack
+            }
+
+        Nothing ->
+            model
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        save : Model -> Model
+        save =
+            saveModel model
+    in
     case msg of
         SetViewBox newViewBox ->
             ( { model | viewBox = newViewBox }, Cmd.none )
 
         PathStringChanged newPathString ->
-            ( { model
-                | pathString = newPathString
-                , path = Path.Parser.parse newPathString
-              }
+            ( save
+                { model
+                    | pathString = newPathString
+                    , path = Path.Parser.parse newPathString
+                }
             , Cmd.none
             )
 
@@ -306,13 +435,14 @@ update msg model =
                         )
 
                     else
-                        ( { model
-                            | path =
-                                { components = model.path.components
-                                , hovered = model.path.hovered
-                                , selected = []
-                                }
-                          }
+                        ( save
+                            { model
+                                | path =
+                                    { components = model.path.components
+                                    , hovered = model.path.hovered
+                                    , selected = []
+                                    }
+                            }
                         , Cmd.none
                         )
 
@@ -353,7 +483,10 @@ update msg model =
                                         [ temporarySelection ]
                                 }
                     in
-                    ( { model | path = newPath, state = Neutral }, Cmd.none )
+                    ( save
+                        { model | path = newPath, state = Neutral }
+                    , Cmd.none
+                    )
 
                 Dragging { dragStart, temporarySelection } ->
                     let
@@ -367,7 +500,7 @@ update msg model =
 
                         newPath : Path
                         newPath =
-                            if Debug.log "selected" alreadySelected then
+                            if alreadySelected then
                                 Path.update model.path dragOffset
 
                             else
@@ -380,27 +513,29 @@ update msg model =
                         newPathString =
                             Path.toString newPath
                     in
-                    ( { model
-                        | path = newPath
-                        , pathString = newPathString
-                        , state = Neutral
-                      }
+                    ( save
+                        { model
+                            | path = newPath
+                            , pathString = newPathString
+                            , state = Neutral
+                        }
                     , Cmd.none
                     )
 
                 Selecting selectStart ->
-                    ( { model
-                        | path =
-                            { components = model.path.components
-                            , hovered = model.path.hovered
-                            , selected =
-                                Path.selectionsWithin
-                                    selectStart
-                                    model.mouseOffset
-                                    model.path
-                            }
-                        , state = Neutral
-                      }
+                    ( save
+                        { model
+                            | path =
+                                { components = model.path.components
+                                , hovered = model.path.hovered
+                                , selected =
+                                    Path.selectionsWithin
+                                        selectStart
+                                        model.mouseOffset
+                                        model.path
+                                }
+                            , state = Neutral
+                        }
                     , Cmd.none
                     )
 
@@ -424,10 +559,21 @@ update msg model =
                 Selecting _ ->
                     ( model, Cmd.none )
 
-        SetActiveKey { keyCode } ->
+        KeyDown { keyCode } ->
             case keyCode of
                 Ambiguous _ ->
                     ( { model | metaPressed = True }, Cmd.none )
+
+                Z ->
+                    if not model.metaPressed then
+                        if shiftPressed model then
+                            ( redo model, Cmd.none )
+
+                        else
+                            ( undo model, Cmd.none )
+
+                    else
+                        ( model, Cmd.none )
 
                 _ ->
                     if not model.metaPressed then
@@ -436,13 +582,19 @@ update msg model =
                     else
                         ( model, Cmd.none )
 
-        UnsetActiveKey { keyCode } ->
+        KeyUp { keyCode } ->
             case keyCode of
                 Ambiguous _ ->
                     ( { model | metaPressed = False }, Cmd.none )
 
                 _ ->
                     ( unsetActiveKey keyCode model, Cmd.none )
+
+        Undo ->
+            ( undo model, Cmd.none )
+
+        Redo ->
+            ( redo model, Cmd.none )
 
 
 
@@ -465,8 +617,8 @@ subscriptions model =
         baseSubscriptions =
             [ BrowserE.onMouseMove (JsonD.map MouseMove decodeMouseOffset)
             , BrowserE.onMouseUp (JsonD.succeed MouseUp)
-            , BrowserE.onKeyDown (JsonD.map SetActiveKey decodeKeyboardEvent)
-            , BrowserE.onKeyUp (JsonD.map UnsetActiveKey decodeKeyboardEvent)
+            , BrowserE.onKeyDown (JsonD.map KeyDown decodeKeyboardEvent)
+            , BrowserE.onKeyUp (JsonD.map KeyUp decodeKeyboardEvent)
             , BrowserE.onResize WindowResized
             ]
     in
@@ -952,6 +1104,32 @@ viewViewBoxSize viewBox =
         ]
 
 
+viewUndoRedo : Model -> Html Msg
+viewUndoRedo { undoStack, redoStack } =
+    let
+        undoCount : Int
+        undoCount =
+            List.length undoStack
+
+        redoCount : Int
+        redoCount =
+            List.length redoStack
+    in
+    Html.div
+        [ HtmlA.style "padding-left" "10px" ]
+        [ Html.button
+            [ HtmlE.onClick Undo, HtmlA.disabled (undoCount == 0) ]
+            [ Html.text
+                (String.concat [ "Undo (", String.fromInt undoCount, ")" ])
+            ]
+        , Html.button
+            [ HtmlE.onClick Redo, HtmlA.disabled (redoCount == 0) ]
+            [ Html.text
+                (String.concat [ "Redo (", String.fromInt redoCount, ")" ])
+            ]
+        ]
+
+
 viewState : State -> Point -> Html Msg
 viewState state offset =
     Html.p
@@ -985,6 +1163,7 @@ viewUI model =
         , HtmlA.style "bottom" "0"
         ]
         [ viewViewBoxSize model.viewBox
+        , viewUndoRedo model
         , viewState model.state model.mouseOffset
         , viewPathStringInput model.pathString
         ]
