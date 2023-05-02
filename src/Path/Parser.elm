@@ -16,14 +16,17 @@ import Path
 import Point exposing (Point)
 
 
-{-| The result of parsing a substring of a Command string.
+{-| The result of parsing a substring of a command String. It is either a Valid
+Command, in which case it will be included in the final Path, or an Invalid
+String.
 -}
 type Result
     = Valid Command
     | Invalid String
 
 
-{-| All the CommandTypes with parameters (everything but the Close Command).
+{-| All the CommandTypes that have parameters (everything but the Close
+command).
 -}
 type ParameterizedCommandType
     = Move
@@ -40,22 +43,23 @@ type ParameterizedCommandType
 {-| The State that the Builder is in.
 
   - In the Chomping State, the Builder builds up a String of chomped invalid
-    characters until it finds a Command letter. The Builder will enter one of
-    its other States if it encounters a valid Command letter, and store the
+    characters until it finds a valid command letter. The Builder will enter one of
+    its other States if it encounters a valid command letter, and store the
     chomped String as an Invalid Result.
 
   - In the ParsingParameterizedCommandType State, the Builder parses sets of
-    parameters corresponding to the commandType. Sequential sets of parameters
-    are parsed into Valid Results. If the Builder encounters a Command letter,
-    and it has already parsedOne set of parameters, the current State's
-    commandType will switch to the corresponding Command letter's type (unless
-    the letter is "Z"/"z", in which case it will switch to the ParsedClose
-    State). If it hasn't parsedOne, or otherwise fails to parse a set of
-    parameters at any point, it will enter the Chomping State. The relation is
-    determined by the case of the Command letter that was parsed to enter this
-    State (lowercase -> Relative, uppercase -> Absolute).
+    parameters corresponding to a ParameterizedCommandType. Sequential sets of
+    parameters are parsed into Valid Results. If the Builder encounters a
+    command letter, and it has already parsed one set of parameters, the current
+    State's commandType will switch to the corresponding command letter's type
+    (unless the letter is "Z"/"z", in which case it will switch to the
+    ParsedClose State). If it hasn't parsed one, or otherwise fails to parse a
+    set of parameters at any point, it will enter the Chomping State. The
+    Relation of the command sequence that is currently being parsed is
+    determined by the case of the command letter that caused the Builder to
+    enter this State (lowercase -> Relative, uppercase -> Absolute).
 
-  - In the ParsedClose State, the Builder only attempts to parse Command
+  - In the ParsedClose State, the Builder only attempts to parse command
     letters. If it fails to find one, it will enter the Chomping State.
 
 -}
@@ -69,8 +73,8 @@ type State
     | ParsedClose
 
 
-{-| A data structure that stores the results of parsing the commandString along
-with the current State.
+{-| A data structure that stores the Results of parsing the command String along
+with the current State of the parsing process.
 -}
 type alias Builder =
     { results : List Result
@@ -83,7 +87,7 @@ initBuilder =
     { results = [], state = Chomping "" }
 
 
-{-| A List of tuples mapping uppercase Command letters to State builder
+{-| A List of tuples mapping uppercase command letters to State builder
 functions (which map a Relation to a State). Used by parameterizedCommandLetters
 to build up parsers for all parameterized Command letters.
 -}
@@ -116,6 +120,8 @@ commandLetterToStateBuilder =
 -------------
 
 
+{-| A parsed float value along with the separator that follows it.
+-}
 type alias FormattedFloat =
     { value : Float
     , afterValue : Separator
@@ -132,6 +138,9 @@ getFloatSeparator { afterValue } =
     afterValue
 
 
+{-| Two parsed Floats representing the x and y values of a Point along with the
+respective separators that follow each value.
+-}
 type alias FormattedPoint =
     { x : Float
     , afterX : Separator
@@ -150,7 +159,43 @@ getPointSeparator { afterX, afterY } =
     { x = afterX, y = afterY }
 
 
-{-| Chomp a character and add it to the current chompedString.
+{-| A parsed ArcSize along with the separator that follows it.
+-}
+type alias FormattedArcSize =
+    { size : ArcSize
+    , afterSize : Separator
+    }
+
+
+getArcSize : FormattedArcSize -> ArcSize
+getArcSize { size } =
+    size
+
+
+getArcSizeSeparator : FormattedArcSize -> Separator
+getArcSizeSeparator { afterSize } =
+    afterSize
+
+
+{-| A parsed ArcRotation along with the separator that follows it.
+-}
+type alias FormattedArcRotation =
+    { rotation : ArcRotation
+    , afterRotation : Separator
+    }
+
+
+getArcRotation : FormattedArcRotation -> ArcRotation
+getArcRotation { rotation } =
+    rotation
+
+
+getArcRotationSeparator : FormattedArcRotation -> Separator
+getArcRotationSeparator { afterRotation } =
+    afterRotation
+
+
+{-| Chomps a character and adds it to the current chompedString.
 -}
 chompOne : String -> Builder -> Parser Builder
 chompOne chompedString builder =
@@ -161,6 +206,9 @@ chompOne chompedString builder =
             )
 
 
+{-| Parser for a Float. The built-in Float parser doesn't account for negative
+Floats.
+-}
 float : Parser Float
 float =
     P.oneOf
@@ -187,6 +235,10 @@ formattedPoint =
         |= separator
 
 
+{-| Parser for a Separator. Only accounts for a comma preceded and/or followed by
+any number of spaces, or a sequence of any number of spaces. The `NoLetter`
+special case is not parsed directly.
+-}
 separator : Parser Separator
 separator =
     P.oneOf
@@ -213,6 +265,33 @@ separator =
         ]
 
 
+formattedArcSize : Parser FormattedArcSize
+formattedArcSize =
+    P.succeed FormattedArcSize
+        |= P.oneOf
+            [ P.succeed Large
+                |. P.symbol "1"
+            , P.succeed Small
+                |. P.symbol "0"
+            ]
+        |= separator
+
+
+formattedArcRotation : Parser FormattedArcRotation
+formattedArcRotation =
+    P.succeed FormattedArcRotation
+        |= P.oneOf
+            [ P.succeed Clockwise
+                |. P.symbol "1"
+            , P.succeed CounterClockwise
+                |. P.symbol "0"
+            ]
+        |= separator
+
+
+{-| Parser that parses a command letter for a ParameterizedCommandType and
+updates the Builder's State accordingly.
+-}
 parameterizedCommandLetters : Builder -> Parser Builder
 parameterizedCommandLetters builder =
     let
@@ -229,25 +308,228 @@ parameterizedCommandLetters builder =
     P.oneOf (List.map letterParser commandLetterToStateBuilder)
 
 
+{-| The parameters of a cubic curve which are always parsed regardless of
+whether or not the command is part of the tail of an implicit sequence or not.
+-}
+type alias FormattedCubicCurve =
+    { startControl : FormattedPoint
+    , endControl : FormattedPoint
+    , to : FormattedPoint
+    }
+
+
+{-| Parser for a FormattedCubicCurve. Parses a formatted end control Point, then
+formatted to Point. The result is then paired with a separator to make a
+complete CubicCurve.
+-}
+formattedCubicCurve : Parser FormattedCubicCurve
+formattedCubicCurve =
+    P.succeed FormattedCubicCurve
+        |= formattedPoint
+        |= formattedPoint
+        |= formattedPoint
+
+
+{-| The parameters of a smooth cubic curve which are always parsed regardless of
+whether or not the command is part of the tail of an implicit sequence or not.
+-}
+type alias FormattedSmoothCubicCurve =
+    { endControl : FormattedPoint
+    , to : FormattedPoint
+    }
+
+
+{-| Parser for a FormattedSmoothCubicCurve. Parses a formatted end control
+Point, then a formatted to Point. The result is then paired with a separator to
+make a complete SmoothCubicCurve.
+-}
+formattedSmoothCubicCurve : Parser FormattedSmoothCubicCurve
+formattedSmoothCubicCurve =
+    P.succeed FormattedSmoothCubicCurve
+        |= formattedPoint
+        |= formattedPoint
+
+
+{-| The parameters of a quadratic curve which are always parsed regardless of
+whether or not the command is part of the tail of an implicit sequence or not.
+-}
+type alias FormattedQuadraticCurve =
+    { control : FormattedPoint
+    , to : FormattedPoint
+    }
+
+
+{-| Parser for a FormattedQuadraticCurve. Parses a formatted control Point, then
+a formatted to Point. The result is then paired with a separator to make a
+complete QuadraticCurveCommand.
+-}
+formattedQuadraticCurve : Parser FormattedQuadraticCurve
+formattedQuadraticCurve =
+    P.succeed FormattedQuadraticCurve
+        |= formattedPoint
+        |= formattedPoint
+
+
+{-| The parameters of an arc which are always parsed regardless of whether or
+not the command is part of the tail of an implicit sequence or not.
+-}
+type alias FormattedArc =
+    { radii : FormattedPoint
+    , angle : FormattedFloat
+    , size : FormattedArcSize
+    , rotation : FormattedArcRotation
+    , to : FormattedPoint
+    }
+
+
+{-| Parser for a Formatted. Parses a formatted Point that represents the radii,
+a formatted angle Float, a formatted ArcSize, a formatted ArcRotation, and a
+formatted to Point. The result is then paired with a separator to make a
+complete ArcCommand.
+-}
+formattedArc : Parser FormattedArc
+formattedArc =
+    P.succeed FormattedArc
+        |= formattedPoint
+        |= formattedFloat
+        |= formattedArcSize
+        |= formattedArcRotation
+        |= formattedPoint
+
+
+{-| Constructs a MoveCommand from a separator and a formatted to Point.
+-}
+makeMove : Separator -> FormattedPoint -> CommandType
+makeMove sep formattedTo =
+    MoveCommand
+        { to = getPoint formattedTo }
+        { afterLetter = sep
+        , afterTo = getPointSeparator formattedTo
+        }
+
+
+{-| Constructs a LineCommand from a separator and a formatted to Point.
+-}
+makeLine : Separator -> FormattedPoint -> CommandType
+makeLine sep formattedTo =
+    LineCommand
+        { to = getPoint formattedTo }
+        { afterLetter = sep
+        , afterTo = getPointSeparator formattedTo
+        }
+
+
+{-| Constructs a HorizontalLineCommand from a separator and a formatted toX
+Float.
+-}
+makeHorizontalLine : Separator -> FormattedFloat -> CommandType
+makeHorizontalLine sep formattedToX =
+    HorizontalLineCommand
+        { toX = getFloat formattedToX }
+        { afterLetter = sep
+        , afterToX = getFloatSeparator formattedToX
+        }
+
+
+{-| Constructs a VerticalLineCommand from a separator and a formatted toY Float.
+-}
+makeVerticalLine : Separator -> FormattedFloat -> CommandType
+makeVerticalLine sep formattedToY =
+    VerticalLineCommand
+        { toY = getFloat formattedToY }
+        { afterLetter = sep
+        , afterToY = getFloatSeparator formattedToY
+        }
+
+
+{-| Constructs a CubicCurveCommand from a separator, a formatted start control
+Point, a formatted end control Point, and a formatted to Point.
+-}
+makeCubicCurve : Separator -> FormattedCubicCurve -> CommandType
+makeCubicCurve sep { startControl, endControl, to } =
+    CubicCurveCommand
+        { startControl = getPoint startControl
+        , endControl = getPoint endControl
+        , to = getPoint to
+        }
+        { afterLetter = sep
+        , afterStartControl = getPointSeparator startControl
+        , afterEndControl = getPointSeparator endControl
+        , afterTo = getPointSeparator to
+        }
+
+
+{-| Constructs a SmoothCubicCurveCommand from a separator, a formatted end
+control Point, and a formatted to Point.
+-}
+makeSmoothCubicCurve : Separator -> FormattedSmoothCubicCurve -> CommandType
+makeSmoothCubicCurve sep { endControl, to } =
+    SmoothCubicCurveCommand
+        { endControl = getPoint endControl
+        , to = getPoint to
+        }
+        { afterLetter = sep
+        , afterEndControl = getPointSeparator endControl
+        , afterTo = getPointSeparator to
+        }
+
+
+{-| Constructs a QuadraticCurveCommand from a separator, a formatted control
+Point, and a formatted to Point.
+-}
+makeQuadraticCurve : Separator -> FormattedQuadraticCurve -> CommandType
+makeQuadraticCurve sep { control, to } =
+    QuadraticCurveCommand
+        { control = getPoint control
+        , to = getPoint to
+        }
+        { afterLetter = sep
+        , afterControl = getPointSeparator control
+        , afterTo = getPointSeparator to
+        }
+
+
+{-| Constructs a SmoothQuadraticCurveCommand from a separator and a formatted to
+Point.
+-}
+makeSmoothQuadraticCurve : Separator -> FormattedPoint -> CommandType
+makeSmoothQuadraticCurve sep formattedTo =
+    SmoothQuadraticCurveCommand
+        { to = getPoint formattedTo }
+        { afterLetter = sep
+        , afterTo = getPointSeparator formattedTo
+        }
+
+
+{-| Constructs a SmoothQuadraticCurveCommand from a separator and a formatted to
+Point.
+-}
+makeArc : Separator -> FormattedArc -> CommandType
+makeArc sep { radii, angle, size, rotation, to } =
+    ArcCommand
+        { radii = getPoint radii
+        , angle = getFloat angle
+        , size = getArcSize size
+        , rotation = getArcRotation rotation
+        , to = getPoint to
+        }
+        { afterLetter = sep
+        , afterRadii = getPointSeparator radii
+        , afterAngle = getFloatSeparator angle
+        , afterSize = getArcSizeSeparator size
+        , afterRotation = getArcRotationSeparator rotation
+        , afterTo = getPointSeparator to
+        }
+
+
+{-| Parser for a MoveCommand. If the command is the first command parsed after
+the command letter, then it is parsed with a separator after that letter.
+Otherwise, it is parsed as a LineCommand instead as part of an implicit
+sequence, so it skips parsing the afterLetter separator and automatically
+populates it with NoLetter.
+-}
 moveCommand : Bool -> Parser CommandType
 moveCommand parsedOne =
-    let
-        makeMove : Separator -> FormattedPoint -> CommandType
-        makeMove sep formattedTo =
-            MoveCommand
-                { to = getPoint formattedTo }
-                { afterLetter = sep
-                , afterTo = getPointSeparator formattedTo
-                }
-
-        makeLine : Separator -> FormattedPoint -> CommandType
-        makeLine sep formattedTo =
-            LineCommand
-                { to = getPoint formattedTo }
-                { afterLetter = sep
-                , afterTo = getPointSeparator formattedTo
-                }
-    in
     if parsedOne then
         P.succeed (makeLine NoLetter)
             |= formattedPoint
@@ -258,17 +540,12 @@ moveCommand parsedOne =
             |= formattedPoint
 
 
+{-| Parser for a LineCommand. If the command is the first command parsed after
+the command letter, then it is parsed with a separator after the letter.
+Otherwise, it is parsed as part of an implicit sequence, so it skips parsing the afterLetter separator and automatically populates it with NoLetter.
+-}
 lineCommand : Bool -> Parser CommandType
 lineCommand parsedOne =
-    let
-        makeLine : Separator -> FormattedPoint -> CommandType
-        makeLine sep formattedTo =
-            LineCommand
-                { to = getPoint formattedTo }
-                { afterLetter = sep
-                , afterTo = getPointSeparator formattedTo
-                }
-    in
     if parsedOne then
         P.succeed (makeLine NoLetter)
             |= formattedPoint
@@ -279,17 +556,13 @@ lineCommand parsedOne =
             |= formattedPoint
 
 
+{-| Parser for a HorizontalLineCommand. If the command is the first command
+parsed after the command letter, then it is parsed with a separator after the
+letter. Otherwise, it is parsed as part of an implicit sequence, so it skips
+parsing the afterLetter separator and automatically populates it with NoLetter.
+-}
 horizontalLineCommand : Bool -> Parser CommandType
 horizontalLineCommand parsedOne =
-    let
-        makeHorizontalLine : Separator -> FormattedFloat -> CommandType
-        makeHorizontalLine sep formattedToX =
-            HorizontalLineCommand
-                { toX = getFloat formattedToX }
-                { afterLetter = sep
-                , afterToX = getFloatSeparator formattedToX
-                }
-    in
     if parsedOne then
         P.succeed (makeHorizontalLine NoLetter)
             |= formattedFloat
@@ -300,17 +573,12 @@ horizontalLineCommand parsedOne =
             |= formattedFloat
 
 
+{-| Parser for a VerticalLineCommand. If the command is the first command parsed
+after the command letter, then it is parsed with a separator after the letter.
+Otherwise, it is parsed as part of an implicit sequence, so it skips parsing the afterLetter separator and automatically populates it with NoLetter.
+-}
 verticalLineCommand : Bool -> Parser CommandType
 verticalLineCommand parsedOne =
-    let
-        makeVerticalLine : Separator -> FormattedFloat -> CommandType
-        makeVerticalLine sep formattedToY =
-            VerticalLineCommand
-                { toY = getFloat formattedToY }
-                { afterLetter = sep
-                , afterToY = getFloatSeparator formattedToY
-                }
-    in
     if parsedOne then
         P.succeed (makeVerticalLine NoLetter)
             |= formattedFloat
@@ -321,40 +589,12 @@ verticalLineCommand parsedOne =
             |= formattedFloat
 
 
-type alias FormattedCubicCurve =
-    { startControl : FormattedPoint
-    , endControl : FormattedPoint
-    , to : FormattedPoint
-    }
-
-
-type alias MakeCubicCurve =
-    Separator -> FormattedCubicCurve -> CommandType
-
-
+{-| Parser for a CubicCurveCommand. If the command is the first command parsed
+after the command letter, then it is parsed with a separator after the letter.
+Otherwise, it is parsed as part of an implicit sequence, so it skips parsing the afterLetter separator and automatically populates it with NoLetter.
+-}
 cubicCurveCommand : Bool -> Parser CommandType
 cubicCurveCommand parsedOne =
-    let
-        makeCubicCurve : MakeCubicCurve
-        makeCubicCurve sep { startControl, endControl, to } =
-            CubicCurveCommand
-                { startControl = getPoint startControl
-                , endControl = getPoint endControl
-                , to = getPoint to
-                }
-                { afterLetter = sep
-                , afterStartControl = getPointSeparator startControl
-                , afterEndControl = getPointSeparator endControl
-                , afterTo = getPointSeparator to
-                }
-
-        formattedCubicCurve : Parser FormattedCubicCurve
-        formattedCubicCurve =
-            P.succeed FormattedCubicCurve
-                |= formattedPoint
-                |= formattedPoint
-                |= formattedPoint
-    in
     if parsedOne then
         P.succeed (makeCubicCurve NoLetter)
             |= formattedCubicCurve
@@ -365,36 +605,13 @@ cubicCurveCommand parsedOne =
             |= formattedCubicCurve
 
 
-type alias FormattedSmoothCubicCurve =
-    { endControl : FormattedPoint
-    , to : FormattedPoint
-    }
-
-
-type alias MakeSmoothCubicCurve =
-    Separator -> FormattedSmoothCubicCurve -> CommandType
-
-
+{-| Parser for a SmoothCubicCurveCommand. If the command is the first command
+parsed after the command letter, then it is parsed with a separator after the
+letter. Otherwise, it is parsed as part of an implicit sequence, so it skips
+parsing the afterLetter separator and automatically populates it with NoLetter.
+-}
 smoothCubicCurveCommand : Bool -> Parser CommandType
 smoothCubicCurveCommand parsedOne =
-    let
-        makeSmoothCubicCurve : MakeSmoothCubicCurve
-        makeSmoothCubicCurve sep { endControl, to } =
-            SmoothCubicCurveCommand
-                { endControl = getPoint endControl
-                , to = getPoint to
-                }
-                { afterLetter = sep
-                , afterEndControl = getPointSeparator endControl
-                , afterTo = getPointSeparator to
-                }
-
-        formattedSmoothCubicCurve : Parser FormattedSmoothCubicCurve
-        formattedSmoothCubicCurve =
-            P.succeed FormattedSmoothCubicCurve
-                |= formattedPoint
-                |= formattedPoint
-    in
     if parsedOne then
         P.succeed (makeSmoothCubicCurve NoLetter)
             |= formattedSmoothCubicCurve
@@ -405,36 +622,13 @@ smoothCubicCurveCommand parsedOne =
             |= formattedSmoothCubicCurve
 
 
-type alias FormattedQuadraticCurve =
-    { control : FormattedPoint
-    , to : FormattedPoint
-    }
-
-
-type alias MakeQuadraticCurve =
-    Separator -> FormattedQuadraticCurve -> CommandType
-
-
+{-| Parser for a QuadraticCurveCommand. If the command is the first command
+parsed after the command letter, then it is parsed with a separator after the
+letter. Otherwise, it is parsed as part of an implicit sequence, so it skips
+parsing the afterLetter separator and automatically populates it with NoLetter.
+-}
 quadraticCurveCommand : Bool -> Parser CommandType
 quadraticCurveCommand parsedOne =
-    let
-        makeQuadraticCurve : MakeQuadraticCurve
-        makeQuadraticCurve sep { control, to } =
-            QuadraticCurveCommand
-                { control = getPoint control
-                , to = getPoint to
-                }
-                { afterLetter = sep
-                , afterControl = getPointSeparator control
-                , afterTo = getPointSeparator to
-                }
-
-        formattedQuadraticCurve : Parser FormattedQuadraticCurve
-        formattedQuadraticCurve =
-            P.succeed FormattedQuadraticCurve
-                |= formattedPoint
-                |= formattedPoint
-    in
     if parsedOne then
         P.succeed (makeQuadraticCurve NoLetter)
             |= formattedQuadraticCurve
@@ -445,17 +639,14 @@ quadraticCurveCommand parsedOne =
             |= formattedQuadraticCurve
 
 
+{-| Parser for a SmoothQuadraticCurveCommand. If the command is the first
+command parsed after the command letter, then it is parsed with a separator
+after the letter. Otherwise, it is parsed as part of an implicit sequence, so it
+skips parsing the afterLetter separator and automatically populates it with
+NoLetter.
+-}
 smoothQuadraticCurveCommand : Bool -> Parser CommandType
 smoothQuadraticCurveCommand parsedOne =
-    let
-        makeSmoothQuadraticCurve : Separator -> FormattedPoint -> CommandType
-        makeSmoothQuadraticCurve sep formattedTo =
-            SmoothQuadraticCurveCommand
-                { to = getPoint formattedTo }
-                { afterLetter = sep
-                , afterTo = getPointSeparator formattedTo
-                }
-    in
     if parsedOne then
         P.succeed (makeSmoothQuadraticCurve NoLetter)
             |= formattedPoint
@@ -466,104 +657,13 @@ smoothQuadraticCurveCommand parsedOne =
             |= formattedPoint
 
 
-type alias FormattedArcSize =
-    { size : ArcSize
-    , afterSize : Separator
-    }
-
-
-getArcSize : FormattedArcSize -> ArcSize
-getArcSize { size } =
-    size
-
-
-getArcSizeSeparator : FormattedArcSize -> Separator
-getArcSizeSeparator { afterSize } =
-    afterSize
-
-
-formattedArcSize : Parser FormattedArcSize
-formattedArcSize =
-    P.succeed FormattedArcSize
-        |= P.oneOf
-            [ P.succeed Large
-                |. P.symbol "1"
-            , P.succeed Small
-                |. P.symbol "0"
-            ]
-        |= separator
-
-
-type alias FormattedArcRotation =
-    { rotation : ArcRotation
-    , afterRotation : Separator
-    }
-
-
-getArcRotation : FormattedArcRotation -> ArcRotation
-getArcRotation { rotation } =
-    rotation
-
-
-getArcRotationSeparator : FormattedArcRotation -> Separator
-getArcRotationSeparator { afterRotation } =
-    afterRotation
-
-
-formattedArcRotation : Parser FormattedArcRotation
-formattedArcRotation =
-    P.succeed FormattedArcRotation
-        |= P.oneOf
-            [ P.succeed Clockwise
-                |. P.symbol "1"
-            , P.succeed CounterClockwise
-                |. P.symbol "0"
-            ]
-        |= separator
-
-
-type alias FormattedArc =
-    { radii : FormattedPoint
-    , angle : FormattedFloat
-    , size : FormattedArcSize
-    , rotation : FormattedArcRotation
-    , to : FormattedPoint
-    }
-
-
-type alias MakeArc =
-    Separator -> FormattedArc -> CommandType
-
-
+{-| Parser for an ArcCommand. If the command is the first command parsed after
+the command letter, then it is parsed with a separator after the letter.
+Otherwise, it is parsed as part of an implicit sequence, so it skips parsing
+the afterLetter separator and automatically populates it with NoLetter.
+-}
 arcCommand : Bool -> Parser CommandType
 arcCommand parsedOne =
-    let
-        makeArc : MakeArc
-        makeArc sep { radii, angle, size, rotation, to } =
-            ArcCommand
-                { radii = getPoint radii
-                , angle = getFloat angle
-                , size = getArcSize size
-                , rotation = getArcRotation rotation
-                , to = getPoint to
-                }
-                { afterLetter = sep
-                , afterRadii = getPointSeparator radii
-                , afterAngle = getFloatSeparator angle
-                , afterSize = getArcSizeSeparator size
-                , afterRotation = getArcRotationSeparator rotation
-                , afterTo = getPointSeparator to
-                }
-
-        formattedArc : Parser FormattedArc
-        formattedArc =
-            P.succeed FormattedArc
-                |= formattedPoint
-                |= formattedFloat
-                |= formattedArcSize
-                |= formattedArcRotation
-                |= formattedPoint
-    in
     if parsedOne then
         P.succeed (makeArc NoLetter)
             |= formattedArc
@@ -824,6 +924,8 @@ finishBuilder { results, state } =
             results
 
 
+{-| Converts a Result to a Command if it is Valid, otherwise returns Nothing.
+-}
 resultToCommand : Result -> Maybe Command
 resultToCommand result =
     case result of
@@ -834,6 +936,11 @@ resultToCommand result =
             Nothing
 
 
+{-| Parses a command String into a Path. Skips over any invalid substrings in
+the String and only includes valid substrings that map to commands in the Path.
+The Builder keeps track of invalid substrings but for now those are just
+discarded.
+-}
 parse : String -> Path
 parse commandString =
     case P.run builderLoop commandString of
