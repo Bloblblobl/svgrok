@@ -54,6 +54,11 @@ zoom factor viewBox =
     }
 
 
+pan : Float -> Float -> ViewBox -> ViewBox
+pan deltaX deltaY viewBox =
+    { viewBox | minX = viewBox.minX + deltaX, minY = viewBox.minY + deltaY }
+
+
 scalePoint : ViewBox -> Point -> Point
 scalePoint { width, height, actualWidth, actualHeight } { x, y } =
     { x = toFloat << round <| x * width / actualWidth

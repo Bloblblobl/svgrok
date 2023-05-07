@@ -572,6 +572,7 @@ update msg model =
                     else
                         ( model, Cmd.none )
 
+                -- ZOOM
                 Q ->
                     let
                         newZoomFactor : Float
@@ -594,6 +595,35 @@ update msg model =
                     ( { model
                         | viewBox = ViewBox.zoom newZoomFactor model.viewBox
                         , zoomFactor = newZoomFactor
+                      }
+                    , Cmd.none
+                    )
+
+                -- PAN
+                H ->
+                    ( { model
+                        | viewBox = ViewBox.pan -5 0 model.viewBox
+                      }
+                    , Cmd.none
+                    )
+
+                J ->
+                    ( { model
+                        | viewBox = ViewBox.pan 0 -5 model.viewBox
+                      }
+                    , Cmd.none
+                    )
+
+                K ->
+                    ( { model
+                        | viewBox = ViewBox.pan 0 5 model.viewBox
+                      }
+                    , Cmd.none
+                    )
+
+                L ->
+                    ( { model
+                        | viewBox = ViewBox.pan 5 0 model.viewBox
                       }
                     , Cmd.none
                     )
