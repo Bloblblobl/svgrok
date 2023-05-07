@@ -46,20 +46,11 @@ fromViewport { scene } =
     }
 
 
-scale : Float -> ViewBox -> ViewBox
-scale scaleTarget viewBox =
-    let
-        scaleFactor : Float
-        scaleFactor =
-            if viewBox.width < viewBox.height then
-                scaleTarget / viewBox.width
-
-            else
-                scaleTarget / viewBox.height
-    in
+zoom : Float -> ViewBox -> ViewBox
+zoom factor viewBox =
     { viewBox
-        | width = viewBox.width * scaleFactor
-        , height = viewBox.height * scaleFactor
+        | width = viewBox.actualWidth / factor
+        , height = viewBox.actualHeight / factor
     }
 
 

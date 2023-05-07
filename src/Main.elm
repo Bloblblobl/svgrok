@@ -58,6 +58,7 @@ type alias Model =
     , mouseOffset : Point
     , state : State
     , activeKeys : List Key
+    , zoomFactor : Float
 
     -- special flag for when the meta key is pressed,
     -- as it messes with key event handling
@@ -71,11 +72,6 @@ type alias Model =
 ----------
 -- INIT --
 ----------
-
-
-viewBoxScale : Float
-viewBoxScale =
-    100
 
 
 initPath : Path
@@ -138,6 +134,7 @@ initModel =
     , mouseOffset = Point.zero
     , state = Neutral
     , activeKeys = []
+    , zoomFactor = 1
     , metaPressed = False
     , undoStack = []
     , redoStack = []
@@ -145,15 +142,15 @@ initModel =
 
 
 getInitialViewBoxFromViewport : Float -> Cmd Msg
-getInitialViewBoxFromViewport scaleFactor =
+getInitialViewBoxFromViewport zoomFactor =
     Task.perform
-        (SetViewBox << ViewBox.scale scaleFactor << ViewBox.fromViewport)
+        (SetViewBox << ViewBox.zoom zoomFactor << ViewBox.fromViewport)
         Browser.Dom.getViewport
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( initModel, getInitialViewBoxFromViewport viewBoxScale )
+    ( initModel, getInitialViewBoxFromViewport initModel.zoomFactor )
 
 
 
@@ -359,7 +356,7 @@ update msg model =
                     , actualHeight = toFloat newHeight
                     }
             in
-            ( { model | viewBox = ViewBox.scale viewBoxScale newViewBox }
+            ( { model | viewBox = ViewBox.zoom model.zoomFactor newViewBox }
             , Cmd.none
             )
 
@@ -574,6 +571,32 @@ update msg model =
 
                     else
                         ( model, Cmd.none )
+
+                Q ->
+                    let
+                        newZoomFactor : Float
+                        newZoomFactor =
+                            model.zoomFactor * 0.5
+                    in
+                    ( { model
+                        | viewBox = ViewBox.zoom newZoomFactor model.viewBox
+                        , zoomFactor = newZoomFactor
+                      }
+                    , Cmd.none
+                    )
+
+                W ->
+                    let
+                        newZoomFactor : Float
+                        newZoomFactor =
+                            model.zoomFactor * 2
+                    in
+                    ( { model
+                        | viewBox = ViewBox.zoom newZoomFactor model.viewBox
+                        , zoomFactor = newZoomFactor
+                      }
+                    , Cmd.none
+                    )
 
                 _ ->
                     if not model.metaPressed then
@@ -1091,8 +1114,8 @@ stateToString state =
                 ]
 
 
-viewViewBoxSize : ViewBox -> Html Msg
-viewViewBoxSize viewBox =
+viewViewBoxSize : ViewBox -> Float -> Html Msg
+viewViewBoxSize viewBox zoomFactor =
     Html.p
         [ HtmlA.style "margin" "0"
         , HtmlA.style "padding-left" "10px"
@@ -1101,6 +1124,8 @@ viewViewBoxSize viewBox =
         , Html.text (String.fromInt (round viewBox.width))
         , Html.text ", Height: "
         , Html.text (String.fromInt (round viewBox.height))
+        , Html.text ", Zoom: "
+        , Html.text (String.fromFloat zoomFactor)
         ]
 
 
@@ -1162,7 +1187,7 @@ viewUI model =
         , HtmlA.style "width" "100%"
         , HtmlA.style "bottom" "0"
         ]
-        [ viewViewBoxSize model.viewBox
+        [ viewViewBoxSize model.viewBox model.zoomFactor
         , viewUndoRedo model
         , viewState model.state model.mouseOffset
         , viewPathStringInput model.pathString
