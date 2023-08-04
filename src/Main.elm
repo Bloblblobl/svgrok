@@ -213,6 +213,67 @@ shiftPressed model =
         model.activeKeys
 
 
+handleKeyDown : KeyboardEvent -> Model -> Model
+handleKeyDown { keyCode } model =
+    case keyCode of
+        Ambiguous _ ->
+            { model | metaPressed = True }
+
+        Z ->
+            if not model.metaPressed then
+                if shiftPressed model then
+                    redo model
+
+                else
+                    undo model
+
+            else
+                model
+
+        -- ZOOM
+        Q ->
+            let
+                newZoomFactor : Float
+                newZoomFactor =
+                    model.zoomFactor * 0.5
+            in
+            { model
+                | viewBox = ViewBox.zoom newZoomFactor model.viewBox
+                , zoomFactor = newZoomFactor
+            }
+
+        W ->
+            let
+                newZoomFactor : Float
+                newZoomFactor =
+                    model.zoomFactor * 2
+            in
+            { model
+                | viewBox = ViewBox.zoom newZoomFactor model.viewBox
+                , zoomFactor = newZoomFactor
+            }
+
+        -- PAN
+        Left ->
+            { model | viewBox = ViewBox.pan -5 0 model.viewBox }
+
+        Up ->
+            { model | viewBox = ViewBox.pan 0 -5 model.viewBox }
+
+        Down ->
+            { model | viewBox = ViewBox.pan 0 5 model.viewBox }
+
+        Right ->
+            { model | viewBox = ViewBox.pan 5 0 model.viewBox }
+
+        _ ->
+            if not model.metaPressed then
+                setActiveKey keyCode model
+
+            else
+                model
+
+
 shouldSave : SavedModel -> SavedModel -> Bool
 shouldSave oldSavedModel newSavedModel =
     let
@@ -520,6 +581,19 @@ update msg model =
                     )
 
                 Selecting selectStart ->
+                    let
+                        viewBoxOffset : Point
+                        viewBoxOffset =
+                            { x = model.viewBox.minX, y = model.viewBox.minY }
+
+                        actualSelectStart : Point
+                        actualSelectStart =
+                            Point.add selectStart viewBoxOffset
+
+                        actualMouseOffset : Point
+                        actualMouseOffset =
+                            Point.add model.mouseOffset viewBoxOffset
+                    in
                     ( save
                         { model
                             | path =
@@ -527,8 +601,8 @@ update msg model =
                                 , hovered = model.path.hovered
                                 , selected =
                                     Path.selectionsWithin
-                                        selectStart
-                                        model.mouseOffset
+                                        (Debug.log "select" actualSelectStart)
+                                        (Debug.log "mouse" actualMouseOffset)
                                         model.path
                                 }
                             , state = Neutral
@@ -556,84 +630,8 @@ update msg model =
                 Selecting _ ->
                     ( model, Cmd.none )
 
-        KeyDown { keyCode } ->
-            case keyCode of
-                Ambiguous _ ->
-                    ( { model | metaPressed = True }, Cmd.none )
-
-                Z ->
-                    if not model.metaPressed then
-                        if shiftPressed model then
-                            ( redo model, Cmd.none )
-
-                        else
-                            ( undo model, Cmd.none )
-
-                    else
-                        ( model, Cmd.none )
-
-                -- ZOOM
-                Q ->
-                    let
-                        newZoomFactor : Float
-                        newZoomFactor =
-                            model.zoomFactor * 0.5
-                    in
-                    ( { model
-                        | viewBox = ViewBox.zoom newZoomFactor model.viewBox
-                        , zoomFactor = newZoomFactor
-                      }
-                    , Cmd.none
-                    )
-
-                W ->
-                    let
-                        newZoomFactor : Float
-                        newZoomFactor =
-                            model.zoomFactor * 2
-                    in
-                    ( { model
-                        | viewBox = ViewBox.zoom newZoomFactor model.viewBox
-                        , zoomFactor = newZoomFactor
-                      }
-                    , Cmd.none
-                    )
-
-                -- PAN
-                H ->
-                    ( { model
-                        | viewBox = ViewBox.pan -5 0 model.viewBox
-                      }
-                    , Cmd.none
-                    )
-
-                J ->
-                    ( { model
-                        | viewBox = ViewBox.pan 0 -5 model.viewBox
-                      }
-                    , Cmd.none
-                    )
-
-                K ->
-                    ( { model
-                        | viewBox = ViewBox.pan 0 5 model.viewBox
-                      }
-                    , Cmd.none
-                    )
-
-                L ->
-                    ( { model
-                        | viewBox = ViewBox.pan 5 0 model.viewBox
-                      }
-                    , Cmd.none
-                    )
-
-                _ ->
-                    if not model.metaPressed then
-                        ( setActiveKey keyCode model, Cmd.none )
-
-                    else
-                        ( model, Cmd.none )
+        KeyDown keyboardEvent ->
+            ( handleKeyDown keyboardEvent model, Cmd.none )
 
         KeyUp { keyCode } ->
             case keyCode of
@@ -1017,24 +1015,24 @@ viewGhost model dragStart temporarySelection =
         (viewPath [] (Path.toString ghostPath) :: viewSelectedPoints ghostPath)
 
 
-viewSelectionBox : Point -> Point -> Svg Msg
-viewSelectionBox bounds1 bounds2 =
+viewSelectionBox : Model -> Point -> Svg Msg
+viewSelectionBox model selectionStart =
     let
         minX : Float
         minX =
-            min bounds1.x bounds2.x
+            min selectionStart.x model.mouseOffset.x
 
         width : Float
         width =
-            max bounds1.x bounds2.x - minX
+            max selectionStart.x model.mouseOffset.x - minX
 
         minY : Float
         minY =
-            min bounds1.y bounds2.y
+            min selectionStart.y model.mouseOffset.y
 
         height : Float
         height =
-            max bounds1.y bounds2.y - minY
+            max selectionStart.y model.mouseOffset.y - minY
     in
     Svg.rect
         [ SvgA.fill "black"
@@ -1043,25 +1041,96 @@ viewSelectionBox bounds1 bounds2 =
         , SvgA.strokeDasharray "0.5 0.5"
         , SvgA.fillOpacity "0.05"
         , SvgA.strokeOpacity "0.5"
-        , SvgA.x (String.fromFloat minX)
-        , SvgA.y (String.fromFloat minY)
+        , SvgA.x (String.fromFloat <| minX + model.viewBox.minX)
+        , SvgA.y (String.fromFloat <| minY + model.viewBox.minY)
         , SvgA.width (String.fromFloat width)
         , SvgA.height (String.fromFloat height)
         ]
         []
 
 
-viewBackground : Svg Msg
-viewBackground =
-    Svg.rect
-        [ SvgA.x "0"
-        , SvgA.y "0"
-        , SvgA.width "100%"
-        , SvgA.height "100%"
-        , SvgA.fill "transparent"
-        , SvgE.onMouseDown MouseDownCanvas
+viewDefs : Svg Msg
+viewDefs =
+    let
+        gridSize : Int
+        gridSize =
+            10
+
+        gridSizeString : String
+        gridSizeString =
+            String.fromInt gridSize
+
+        viewBoxString : String
+        viewBoxString =
+            String.join "," [ "0", "0", gridSizeString, gridSizeString ]
+    in
+    Svg.defs []
+        [ Svg.pattern
+            [ SvgA.id "grid"
+            , SvgA.viewBox viewBoxString
+            , SvgA.width gridSizeString
+            , SvgA.height gridSizeString
+            , SvgA.patternUnits "userSpaceOnUse"
+            , SvgA.x "-0.25"
+            , SvgA.y "-0.25"
+            ]
+            [ Svg.line
+                [ SvgA.x1 "0"
+                , SvgA.y1 "0"
+                , SvgA.x2 gridSizeString
+                , SvgA.y2 "0"
+                , SvgA.stroke "black"
+                ]
+                []
+            , Svg.line
+                [ SvgA.x1 "0"
+                , SvgA.y1 "0"
+                , SvgA.x2 "0"
+                , SvgA.y2 gridSizeString
+                , SvgA.stroke "black"
+                ]
+                []
+            ]
         ]
-        []
+
+
+viewAxes : Model -> Svg Msg
+viewAxes { viewBox } =
+    Svg.g [ SvgA.opacity "50%", SvgA.strokeWidth "0.5" ]
+        [ Svg.line
+            [ SvgA.x1 (String.fromFloat viewBox.minX)
+            , SvgA.y1 "0"
+            , SvgA.x2 (String.fromFloat (viewBox.minX + viewBox.width))
+            , SvgA.y2 "0"
+            , SvgA.stroke "black"
+            ]
+            []
+        , Svg.line
+            [ SvgA.x1 "0"
+            , SvgA.y1 (String.fromFloat viewBox.minY)
+            , SvgA.x2 "0"
+            , SvgA.y2 (String.fromFloat (viewBox.minY + viewBox.height))
+            , SvgA.stroke "black"
+            ]
+            []
+        ]
+
+
+viewBackground : Model -> Svg Msg
+viewBackground model =
+    Svg.g []
+        [ Svg.rect
+            [ SvgA.x (String.fromFloat model.viewBox.minX)
+            , SvgA.y (String.fromFloat model.viewBox.minY)
+            , SvgA.width "100%"
+            , SvgA.height "100%"
+            , SvgA.fill "url(#grid)"
+            , SvgE.onMouseDown MouseDownCanvas
+            , SvgA.opacity "10%"
+            ]
+            []
+        , viewAxes model
+        ]
 
 
 {-| Renders a Path as a single SVG element as well as an overlay above it to
@@ -1087,10 +1156,7 @@ viewCanvas model =
                     viewGhost model dragStart temporarySelection :: baseOverlay
 
                 Selecting selectionStart ->
-                    viewSelectionBox
-                        selectionStart
-                        model.mouseOffset
-                        :: baseOverlay
+                    viewSelectionBox model selectionStart :: baseOverlay
     in
     Svg.svg
         [ SvgA.viewBox (ViewBox.toString model.viewBox)
@@ -1098,7 +1164,8 @@ viewCanvas model =
         , SvgA.height "100vh"
         , SvgA.display "block"
         ]
-        [ viewBackground
+        [ viewDefs
+        , viewBackground model
         , Svg.g [] overlay
         ]
 
