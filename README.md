@@ -1,5 +1,9 @@
-# svgrok
-to grok svg
+# svgrok - _to grok svg_
+
+Svgrok is both an SVG path editor and a learning tool for SVG paths (currently
+more of the former and not much of the latter). It's a work in progress, but the
+goal is to make it easy to learn and understand SVG paths (and eventually other
+SVG elements) by providing a visual editor and explanations of the commands.
 
 ### Roadmap
 **V0.5 (First Release)**
