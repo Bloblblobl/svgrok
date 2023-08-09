@@ -1505,6 +1505,18 @@ updateWithSelection path offset selection =
 
 
 
+-- appendCommand : Path -> Command -> Path
+-- appendCommand path command =
+--     let newComponent =
+--             { segment =
+--                 MoveSegment
+--                     { from = path.lastEndPoint
+--                     , to = path.lastEndPoint
+--                     }
+--             , command = command
+--             }
+--     in
+--     { path | components = path.components ++ [ command ] }
 -------------------------
 -- TO STRING FUNCTIONS --
 -------------------------

@@ -33,6 +33,43 @@ type alias OverlayConfig =
     }
 
 
+type DrawingCubicCurveState
+    = DrawingCubicCurveTo
+    | DrawingStartControl { to : Point }
+    | DrawingEndControl { to : Point, startControl : Point }
+
+
+type DrawingOnePointCurveState
+    = DrawingOnePointCurveTo
+    | DrawingControl { to : Point }
+
+
+type DrawingArcState
+    = DrawingArcTo
+    | DrawingArcRadiusX { to : Point }
+    | DrawingArcRadiusY { to : Point, radiusX : Float }
+    | DrawingArcAngle { to : Point, radii : Point }
+    | DrawingArcSize { to : Point, radii : Point, angle : Float }
+    | DrawingArcRotation
+        { to : Point
+        , radii : Point
+        , angle : Float
+        , size : Path.ArcSize
+        }
+
+
+type DrawingState
+    = DrawingMove
+    | DrawingLine
+    | DrawingHorizontalLine
+    | DrawingVerticalLine
+    | DrawingCubicCurve DrawingCubicCurveState
+    | DrawingSmoothCubicCurve DrawingOnePointCurveState
+    | DrawingQuadraticCurve DrawingOnePointCurveState
+    | DrawingSmoothQuadraticCurve
+    | DrawingArc DrawingArcState
+
+
 type State
     = Neutral
     | Clicking
@@ -42,6 +79,7 @@ type State
         }
     | Dragging { dragStart : Point, temporarySelection : Path.Selection }
     | Selecting Point
+    | Drawing DrawingState
 
 
 type alias SavedModel =
@@ -274,6 +312,16 @@ handleKeyDown { keyCode } model =
                 model
 
 
+handleDraw : Model -> DrawingState -> Model
+handleDraw model drawingState =
+    case drawingState of
+        DrawingMove ->
+            { model | path = model.path }
+
+        _ ->
+            model
+
+
 shouldSave : SavedModel -> SavedModel -> Bool
 shouldSave oldSavedModel newSavedModel =
     let
@@ -453,6 +501,9 @@ update msg model =
 
                         Selecting _ ->
                             model.state
+
+                        Drawing _ ->
+                            model.state
             in
             ( { model
                 | mouseOffset = ViewBox.scalePoint model.viewBox newOffset
@@ -484,6 +535,9 @@ update msg model =
                 Selecting _ ->
                     ( model, Cmd.none )
 
+                Drawing _ ->
+                    ( model, Cmd.none )
+
         MouseDownCanvas ->
             case model.state of
                 Neutral ->
@@ -511,6 +565,9 @@ update msg model =
                     ( model, Cmd.none )
 
                 Selecting _ ->
+                    ( model, Cmd.none )
+
+                Drawing _ ->
                     ( model, Cmd.none )
 
         MouseUp ->
@@ -610,6 +667,9 @@ update msg model =
                     , Cmd.none
                     )
 
+                Drawing drawingState ->
+                    ( handleDraw model drawingState, Cmd.none )
+
         SetCanDrag ->
             case model.state of
                 Neutral ->
@@ -628,6 +688,9 @@ update msg model =
                     ( model, Cmd.none )
 
                 Selecting _ ->
+                    ( model, Cmd.none )
+
+                Drawing _ ->
                     ( model, Cmd.none )
 
         KeyDown keyboardEvent ->
@@ -693,6 +756,10 @@ subscriptions model =
                 |> Sub.batch
 
         Selecting _ ->
+            baseSubscriptions
+                |> Sub.batch
+
+        Drawing _ ->
             baseSubscriptions
                 |> Sub.batch
 
@@ -1049,6 +1116,11 @@ viewSelectionBox model selectionStart =
         []
 
 
+viewDrawingState : Model -> DrawingState -> Svg Msg
+viewDrawingState model drawingState =
+    Svg.g [] []
+
+
 viewDefs : Svg Msg
 viewDefs =
     let
@@ -1157,6 +1229,9 @@ viewCanvas model =
 
                 Selecting selectionStart ->
                     viewSelectionBox model selectionStart :: baseOverlay
+
+                Drawing drawingState ->
+                    viewDrawingState model drawingState :: baseOverlay
     in
     Svg.svg
         [ SvgA.viewBox (ViewBox.toString model.viewBox)
@@ -1209,6 +1284,9 @@ stateToString state =
                 , Point.toString selectionStart
                 , " | "
                 ]
+
+        Drawing drawingState ->
+            "Drawing"
 
 
 viewViewBoxSize : ViewBox -> Float -> Html Msg
