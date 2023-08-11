@@ -15,6 +15,9 @@ SVG elements) by providing a visual editor and explanations of the commands.
 - Use `Q`/`W` to zoom out/zoom in
 - Use the arrow keys to pan around the canvas
 - Use the buttons or `Z`/`Shift + Z` to undo/redo (while your focus is not on the input)
+- Use `M`/`L` to enter Move/Line drawing mode (more command types coming soon!)
+  - In these drawing modes, clicking on the canvas will append the respective command to the path
+  - Use `X` to exit either drawing mode
 
 ### Building Locally
 

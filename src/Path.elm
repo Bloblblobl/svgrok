@@ -75,9 +75,14 @@ type alias CloseFormat =
     { afterLetter : Separator }
 
 
-expandedLetterSeparator : Separator
-expandedLetterSeparator =
+defaultSeparator : Separator
+defaultSeparator =
     Spaces 1
+
+
+defaultPointSeparator : PointSeparator
+defaultPointSeparator =
+    { x = defaultSeparator, y = defaultSeparator }
 
 
 expandHorizontalFormat : HorizontalLineFormat -> BaseFormat
@@ -85,7 +90,7 @@ expandHorizontalFormat { afterLetter, afterToX } =
     { afterLetter = afterLetter
     , afterTo =
         if afterToX == Spaces 0 then
-            { x = Spaces 1, y = Spaces 0 }
+            { x = defaultSeparator, y = Spaces 0 }
 
         else
             { x = afterToX, y = afterToX }
@@ -97,7 +102,7 @@ expandVerticalFormat { afterLetter, afterToY } =
     { afterLetter = afterLetter
     , afterTo =
         if afterToY == Spaces 0 then
-            { x = Spaces 1, y = Spaces 0 }
+            { x = defaultSeparator, y = Spaces 0 }
 
         else
             { x = afterToY, y = afterToY }
@@ -118,7 +123,7 @@ expandSmoothQuadraticFormat { afterLetter, afterTo } =
     { afterLetter = afterLetter
     , afterControl =
         if afterTo.y == Spaces 0 then
-            { x = afterTo.x, y = Spaces 1 }
+            { x = afterTo.x, y = defaultSeparator }
 
         else
             afterTo
@@ -309,6 +314,129 @@ init =
     { components = []
     , hovered = Nothing
     , selected = []
+    }
+
+
+preFormattedMove : BaseParameters -> Command
+preFormattedMove params =
+    { relation = Absolute
+    , commandType =
+        MoveCommand
+            params
+            { afterLetter = defaultSeparator
+            , afterTo = defaultPointSeparator
+            }
+    }
+
+
+preFormattedLine : BaseParameters -> Command
+preFormattedLine params =
+    { relation = Absolute
+    , commandType =
+        LineCommand
+            params
+            { afterLetter = defaultSeparator
+            , afterTo = defaultPointSeparator
+            }
+    }
+
+
+preFormattedHorizontalLine : HorizontalLineParameters -> Command
+preFormattedHorizontalLine params =
+    { relation = Absolute
+    , commandType =
+        HorizontalLineCommand
+            params
+            { afterLetter = defaultSeparator
+            , afterToX = defaultSeparator
+            }
+    }
+
+
+preFormattedVerticalLine : VerticalLineParameters -> Command
+preFormattedVerticalLine params =
+    { relation = Absolute
+    , commandType =
+        VerticalLineCommand
+            params
+            { afterLetter = defaultSeparator
+            , afterToY = defaultSeparator
+            }
+    }
+
+
+preFormattedCubicCurve : CubicCurveParameters -> Command
+preFormattedCubicCurve params =
+    { relation = Absolute
+    , commandType =
+        CubicCurveCommand
+            params
+            { afterLetter = defaultSeparator
+            , afterStartControl = defaultPointSeparator
+            , afterEndControl = defaultPointSeparator
+            , afterTo = defaultPointSeparator
+            }
+    }
+
+
+preFormattedSmoothCubicCurve : SmoothCubicCurveParameters -> Command
+preFormattedSmoothCubicCurve params =
+    { relation = Absolute
+    , commandType =
+        SmoothCubicCurveCommand
+            params
+            { afterLetter = defaultSeparator
+            , afterEndControl = defaultPointSeparator
+            , afterTo = defaultPointSeparator
+            }
+    }
+
+
+preFormattedQuadraticCurve : QuadraticCurveParameters -> Command
+preFormattedQuadraticCurve params =
+    { relation = Absolute
+    , commandType =
+        QuadraticCurveCommand
+            params
+            { afterLetter = defaultSeparator
+            , afterControl = defaultPointSeparator
+            , afterTo = defaultPointSeparator
+            }
+    }
+
+
+preFormattedSmoothQuadraticCurve : BaseParameters -> Command
+preFormattedSmoothQuadraticCurve params =
+    { relation = Absolute
+    , commandType =
+        SmoothQuadraticCurveCommand
+            params
+            { afterLetter = defaultSeparator
+            , afterTo = defaultPointSeparator
+            }
+    }
+
+
+preFormattedArc : ArcParameters -> Command
+preFormattedArc params =
+    { relation = Absolute
+    , commandType =
+        ArcCommand
+            params
+            { afterLetter = defaultSeparator
+            , afterRadii = defaultPointSeparator
+            , afterAngle = defaultSeparator
+            , afterSize = defaultSeparator
+            , afterRotation = defaultSeparator
+            , afterTo = defaultPointSeparator
+            }
+    }
+
+
+preFormattedClose : Command
+preFormattedClose =
+    { relation = Absolute
+    , commandType = CloseCommand { afterLetter = defaultSeparator }
     }
 
 
@@ -678,11 +806,6 @@ toggleSelection path selection =
         addSelection path selection
 
 
-defaultPointSeparator : PointSeparator
-defaultPointSeparator =
-    { x = Spaces 0, y = Spaces 0 }
-
-
 defaultLineCommand : Relation -> Command
 defaultLineCommand relation =
     { relation = relation
@@ -847,7 +970,7 @@ type alias AnyFormat r =
 updateFormat : AnyFormat r -> Bool -> AnyFormat r
 updateFormat format inSequence =
     if not inSequence && format.afterLetter == NoLetter then
-        { format | afterLetter = expandedLetterSeparator }
+        { format | afterLetter = defaultSeparator }
 
     else
         format
@@ -1504,19 +1627,244 @@ updateWithSelection path offset selection =
     removeSelection (update (addSelection path selection) offset) selection
 
 
+type alias EndState =
+    { endPoint : Point
+    , controlPoint : Point
+    , endControlPoint : Point
+    , movePoint : Point
+    }
 
--- appendCommand : Path -> Command -> Path
--- appendCommand path command =
---     let newComponent =
---             { segment =
---                 MoveSegment
---                     { from = path.lastEndPoint
---                     , to = path.lastEndPoint
---                     }
---             , command = command
---             }
---     in
---     { path | components = path.components ++ [ command ] }
+
+initEndState : EndState
+initEndState =
+    { endPoint = Point.zero
+    , movePoint = Point.zero
+    , controlPoint = Point.zero
+    , endControlPoint = Point.zero
+    }
+
+
+componentEndState : Component -> EndState -> EndState
+componentEndState component endState =
+    case component.segment of
+        MoveSegment params ->
+            { endState
+                | endPoint = params.to
+                , movePoint = params.to
+                , controlPoint = params.to
+                , endControlPoint = params.to
+            }
+
+        LineSegment params ->
+            { endState
+                | endPoint = params.to
+                , controlPoint = params.to
+                , endControlPoint = params.to
+            }
+
+        CubicCurveSegment params ->
+            { endState
+                | endPoint = params.to
+                , controlPoint = params.to
+                , endControlPoint = params.endControl
+            }
+
+        QuadraticCurveSegment params ->
+            { endState
+                | endPoint = params.to
+                , controlPoint = params.control
+                , endControlPoint = params.to
+            }
+
+        ArcSegment params ->
+            { endState
+                | endPoint = params.to
+                , controlPoint = params.to
+                , endControlPoint = params.to
+            }
+
+        CloseSegment _ ->
+            { endState
+                | endPoint = endState.movePoint
+                , controlPoint = endState.movePoint
+                , endControlPoint = endState.movePoint
+            }
+
+
+toEndState : Path -> EndState
+toEndState path =
+    List.foldl componentEndState initEndState path.components
+
+
+appendCommand : Path -> Command -> Path
+appendCommand path command =
+    let
+        endState : EndState
+        endState =
+            toEndState path
+
+        newSegment : Segment
+        newSegment =
+            case command.commandType of
+                MoveCommand params _ ->
+                    MoveSegment
+                        { from = endState.endPoint
+                        , to =
+                            if command.relation == Absolute then
+                                params.to
+
+                            else
+                                Point.add endState.endPoint params.to
+                        }
+
+                LineCommand params _ ->
+                    LineSegment
+                        { from = endState.endPoint
+                        , to =
+                            if command.relation == Absolute then
+                                params.to
+
+                            else
+                                Point.add endState.endPoint params.to
+                        }
+
+                HorizontalLineCommand params _ ->
+                    LineSegment
+                        { from = endState.endPoint
+                        , to =
+                            if command.relation == Absolute then
+                                { x = params.toX
+                                , y = endState.endPoint.y
+                                }
+
+                            else
+                                { x = endState.endPoint.x + params.toX
+                                , y = endState.endPoint.y
+                                }
+                        }
+
+                VerticalLineCommand params _ ->
+                    LineSegment
+                        { from = endState.endPoint
+                        , to =
+                            if command.relation == Absolute then
+                                { x = endState.endPoint.x
+                                , y = params.toY
+                                }
+
+                            else
+                                { x = endState.endPoint.x
+                                , y = endState.endPoint.y + params.toY
+                                }
+                        }
+
+                CubicCurveCommand params _ ->
+                    CubicCurveSegment
+                        { startControl =
+                            if command.relation == Absolute then
+                                params.startControl
+
+                            else
+                                Point.add endState.endPoint params.startControl
+                        , endControl =
+                            if command.relation == Absolute then
+                                params.endControl
+
+                            else
+                                Point.add endState.endPoint params.endControl
+                        , from = endState.endPoint
+                        , to =
+                            if command.relation == Absolute then
+                                params.to
+
+                            else
+                                Point.add endState.endPoint params.to
+                        }
+
+                SmoothCubicCurveCommand params _ ->
+                    CubicCurveSegment
+                        { startControl =
+                            Point.reflectOver
+                                endState.endPoint
+                                endState.endControlPoint
+                        , endControl =
+                            if command.relation == Absolute then
+                                params.endControl
+
+                            else
+                                Point.add endState.endPoint params.endControl
+                        , from = endState.endPoint
+                        , to =
+                            if command.relation == Absolute then
+                                params.to
+
+                            else
+                                Point.add endState.endPoint params.to
+                        }
+
+                QuadraticCurveCommand params _ ->
+                    QuadraticCurveSegment
+                        { control =
+                            if command.relation == Absolute then
+                                params.control
+
+                            else
+                                Point.add endState.endPoint params.control
+                        , from = endState.endPoint
+                        , to =
+                            if command.relation == Absolute then
+                                params.to
+
+                            else
+                                Point.add endState.endPoint params.to
+                        }
+
+                SmoothQuadraticCurveCommand params _ ->
+                    QuadraticCurveSegment
+                        { control =
+                            Point.reflectOver
+                                endState.endPoint
+                                endState.controlPoint
+                        , from = endState.endPoint
+                        , to =
+                            if command.relation == Absolute then
+                                params.to
+
+                            else
+                                Point.add endState.endPoint params.to
+                        }
+
+                ArcCommand params _ ->
+                    ArcSegment
+                        { radii = params.radii
+                        , angle = params.angle
+                        , size = params.size
+                        , rotation = params.rotation
+                        , from = endState.endPoint
+                        , to =
+                            if command.relation == Absolute then
+                                params.to
+
+                            else
+                                Point.add endState.endPoint params.to
+                        }
+
+                CloseCommand _ ->
+                    CloseSegment
+                        { from = endState.endPoint
+                        , to = endState.movePoint
+                        }
+
+        newComponent : Component
+        newComponent =
+            { segment = newSegment
+            , command = command
+            }
+    in
+    { path | components = path.components ++ [ newComponent ] }
+
+
+
 -------------------------
 -- TO STRING FUNCTIONS --
 -------------------------

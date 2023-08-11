@@ -304,6 +304,21 @@ handleKeyDown { keyCode } model =
         Right ->
             { model | viewBox = ViewBox.pan 5 0 model.viewBox }
 
+        -- DRAWING
+        M ->
+            { model | state = Drawing DrawingMove }
+
+        L ->
+            { model | state = Drawing DrawingLine }
+
+        X ->
+            case model.state of
+                Drawing _ ->
+                    { model | state = Neutral }
+
+                _ ->
+                    model
+
         _ ->
             if not model.metaPressed then
                 setActiveKey keyCode model
@@ -316,7 +331,20 @@ handleDraw : Model -> DrawingState -> Model
 handleDraw model drawingState =
     case drawingState of
         DrawingMove ->
-            { model | path = model.path }
+            let
+                moveCommand : Path.Command
+                moveCommand =
+                    Path.preFormattedMove { to = model.mouseOffset }
+            in
+            { model | path = Path.appendCommand model.path moveCommand }
+
+        DrawingLine ->
+            let
+                lineCommand : Path.Command
+                lineCommand =
+                    Path.preFormattedLine { to = model.mouseOffset }
+            in
+            { model | path = Path.appendCommand model.path lineCommand }
 
         _ ->
             model
@@ -668,7 +696,7 @@ update msg model =
                     )
 
                 Drawing drawingState ->
-                    ( handleDraw model drawingState, Cmd.none )
+                    ( save (handleDraw model drawingState), Cmd.none )
 
         SetCanDrag ->
             case model.state of
