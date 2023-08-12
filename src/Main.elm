@@ -1275,15 +1275,31 @@ viewSelectedPoints path =
         indexedComponents =
             List.indexedMap Tuple.pair path.components
 
-        getSelection : Int -> Path.Selection
-        getSelection index =
-            { index = index, element = Path.EndPoint }
+        makeSelection : Int -> Path.Element -> Path.Selection
+        makeSelection index element =
+            { index = index, element = element }
+
+        possibleSelections : Int -> List Path.Selection
+        possibleSelections index =
+            List.map
+                (makeSelection index)
+                [ Path.EndPoint
+                , Path.StartControl
+                , Path.EndControl
+                , Path.Control
+                ]
+
+        isSelected : Int -> Bool
+        isSelected index =
+            List.any
+                (\selection -> List.member selection path.selected)
+                (possibleSelections index)
 
         selectedComponents : List Path.Component
         selectedComponents =
             List.filterMap
                 (\( index, component ) ->
-                    if List.member (getSelection index) path.selected then
+                    if isSelected index then
                         Just component
 
                     else
@@ -1293,7 +1309,7 @@ viewSelectedPoints path =
 
         selectedPoints : List Point
         selectedPoints =
-            List.map Path.componentEndpoint selectedComponents
+            List.concatMap Path.componentPoints selectedComponents
 
         viewSelectedPoint : Point -> Svg Msg
         viewSelectedPoint =

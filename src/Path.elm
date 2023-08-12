@@ -440,26 +440,26 @@ preFormattedClose =
     }
 
 
-componentEndpoint : Component -> Point
-componentEndpoint component =
+componentPoints : Component -> List Point
+componentPoints component =
     case component.segment of
         MoveSegment { to } ->
-            to
+            [ to ]
 
         LineSegment { to } ->
-            to
+            [ to ]
 
-        CubicCurveSegment { to } ->
-            to
+        CubicCurveSegment { startControl, endControl, to } ->
+            [ startControl, endControl, to ]
 
-        QuadraticCurveSegment { to } ->
-            to
+        QuadraticCurveSegment { control, to } ->
+            [ control, to ]
 
         ArcSegment { to } ->
-            to
+            [ to ]
 
         CloseSegment { to } ->
-            to
+            [ to ]
 
 
 selectionsWithin : Point -> Point -> Path -> List Selection
