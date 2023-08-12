@@ -311,6 +311,9 @@ handleKeyDown { keyCode } model =
         L ->
             { model | state = Drawing DrawingLine }
 
+        C ->
+            { model | state = Drawing (DrawingCubicCurve DrawingCubicCurveTo) }
+
         X ->
             case model.state of
                 Drawing _ ->
@@ -335,16 +338,80 @@ handleDraw model drawingState =
                 moveCommand : Path.Command
                 moveCommand =
                     Path.preFormattedMove { to = model.mouseOffset }
+
+                newPath : Path
+                newPath =
+                    Path.appendCommand model.path moveCommand
             in
-            { model | path = Path.appendCommand model.path moveCommand }
+            { model
+                | path = newPath
+                , pathString = Path.toString newPath
+            }
 
         DrawingLine ->
             let
                 lineCommand : Path.Command
                 lineCommand =
                     Path.preFormattedLine { to = model.mouseOffset }
+
+                newPath : Path
+                newPath =
+                    Path.appendCommand model.path lineCommand
             in
-            { model | path = Path.appendCommand model.path lineCommand }
+            { model
+                | path = newPath
+                , pathString = Path.toString newPath
+            }
+
+        DrawingCubicCurve drawingCubicCurveState ->
+            case drawingCubicCurveState of
+                DrawingCubicCurveTo ->
+                    { model
+                        | state =
+                            Drawing
+                                (DrawingCubicCurve
+                                    (DrawingStartControl
+                                        { to = model.mouseOffset }
+                                    )
+                                )
+                    }
+
+                DrawingStartControl { to } ->
+                    { model
+                        | state =
+                            Drawing
+                                (DrawingCubicCurve
+                                    (DrawingEndControl
+                                        { to = to
+                                        , startControl = model.mouseOffset
+                                        }
+                                    )
+                                )
+                    }
+
+                DrawingEndControl { to, startControl } ->
+                    let
+                        cubicCurveCommand : Path.Command
+                        cubicCurveCommand =
+                            Path.preFormattedCubicCurve
+                                { to = to
+                                , startControl = startControl
+                                , endControl = model.mouseOffset
+                                }
+
+                        newPath : Path
+                        newPath =
+                            Path.appendCommand model.path cubicCurveCommand
+
+                        newState : State
+                        newState =
+                            Drawing (DrawingCubicCurve DrawingCubicCurveTo)
+                    in
+                    { model
+                        | path = newPath
+                        , pathString = Path.toString newPath
+                        , state = newState
+                    }
 
         _ ->
             model
@@ -534,7 +601,10 @@ update msg model =
                             model.state
             in
             ( { model
-                | mouseOffset = ViewBox.scalePoint model.viewBox newOffset
+                | mouseOffset =
+                    Point.add
+                        (ViewBox.scalePoint model.viewBox newOffset)
+                        { x = model.viewBox.minX, y = model.viewBox.minY }
                 , state = newState
               }
             , Cmd.none
