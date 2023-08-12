@@ -257,19 +257,14 @@ handleKeyDown { keyCode } model =
         Ambiguous _ ->
             { model | metaPressed = True }
 
-        Z ->
-            if not model.metaPressed then
-                if shiftPressed model then
-                    redo model
+        U ->
+            undo model
 
-                else
-                    undo model
-
-            else
-                model
+        R ->
+            redo model
 
         -- ZOOM
-        Q ->
+        E ->
             let
                 newZoomFactor : Float
                 newZoomFactor =
@@ -311,8 +306,29 @@ handleKeyDown { keyCode } model =
         L ->
             { model | state = Drawing DrawingLine }
 
+        H ->
+            { model | state = Drawing DrawingHorizontalLine }
+
+        V ->
+            { model | state = Drawing DrawingVerticalLine }
+
         C ->
             { model | state = Drawing (DrawingCubicCurve DrawingCubicCurveTo) }
+
+        S ->
+            { model
+                | state =
+                    Drawing (DrawingSmoothCubicCurve DrawingOnePointCurveTo)
+            }
+
+        Q ->
+            { model
+                | state =
+                    Drawing (DrawingQuadraticCurve DrawingOnePointCurveTo)
+            }
+
+        T ->
+            { model | state = Drawing DrawingSmoothQuadraticCurve }
 
         X ->
             case model.state of
@@ -357,6 +373,38 @@ handleDraw model drawingState =
                 newPath : Path
                 newPath =
                     Path.appendCommand model.path lineCommand
+            in
+            { model
+                | path = newPath
+                , pathString = Path.toString newPath
+            }
+
+        DrawingHorizontalLine ->
+            let
+                horizontalLineCommand : Path.Command
+                horizontalLineCommand =
+                    Path.preFormattedHorizontalLine
+                        { toX = model.mouseOffset.x }
+
+                newPath : Path
+                newPath =
+                    Path.appendCommand model.path horizontalLineCommand
+            in
+            { model
+                | path = newPath
+                , pathString = Path.toString newPath
+            }
+
+        DrawingVerticalLine ->
+            let
+                verticalLineCommand : Path.Command
+                verticalLineCommand =
+                    Path.preFormattedVerticalLine
+                        { toY = model.mouseOffset.y }
+
+                newPath : Path
+                newPath =
+                    Path.appendCommand model.path verticalLineCommand
             in
             { model
                 | path = newPath
@@ -412,6 +460,100 @@ handleDraw model drawingState =
                         , pathString = Path.toString newPath
                         , state = newState
                     }
+
+        DrawingSmoothCubicCurve drawingOnePointCurveState ->
+            case drawingOnePointCurveState of
+                DrawingOnePointCurveTo ->
+                    { model
+                        | state =
+                            Drawing
+                                (DrawingSmoothCubicCurve
+                                    (DrawingControl
+                                        { to = model.mouseOffset }
+                                    )
+                                )
+                    }
+
+                DrawingControl { to } ->
+                    let
+                        smoothCubicCurveCommand : Path.Command
+                        smoothCubicCurveCommand =
+                            Path.preFormattedSmoothCubicCurve
+                                { to = to
+                                , endControl = model.mouseOffset
+                                }
+
+                        newPath : Path
+                        newPath =
+                            Path.appendCommand
+                                model.path
+                                smoothCubicCurveCommand
+
+                        newState : State
+                        newState =
+                            Drawing
+                                (DrawingSmoothCubicCurve DrawingOnePointCurveTo)
+                    in
+                    { model
+                        | path = newPath
+                        , pathString = Path.toString newPath
+                        , state = newState
+                    }
+
+        DrawingQuadraticCurve drawingOnePointCurveState ->
+            case drawingOnePointCurveState of
+                DrawingOnePointCurveTo ->
+                    { model
+                        | state =
+                            Drawing
+                                (DrawingQuadraticCurve
+                                    (DrawingControl
+                                        { to = model.mouseOffset }
+                                    )
+                                )
+                    }
+
+                DrawingControl { to } ->
+                    let
+                        quadraticCurveCommand : Path.Command
+                        quadraticCurveCommand =
+                            Path.preFormattedQuadraticCurve
+                                { to = to
+                                , control = model.mouseOffset
+                                }
+
+                        newPath : Path
+                        newPath =
+                            Path.appendCommand
+                                model.path
+                                quadraticCurveCommand
+
+                        newState : State
+                        newState =
+                            Drawing
+                                (DrawingQuadraticCurve DrawingOnePointCurveTo)
+                    in
+                    { model
+                        | path = newPath
+                        , pathString = Path.toString newPath
+                        , state = newState
+                    }
+
+        DrawingSmoothQuadraticCurve ->
+            let
+                smoothQuadraticCurveCommand : Path.Command
+                smoothQuadraticCurveCommand =
+                    Path.preFormattedSmoothQuadraticCurve
+                        { to = model.mouseOffset }
+
+                newPath : Path
+                newPath =
+                    Path.appendCommand model.path smoothQuadraticCurveCommand
+            in
+            { model
+                | path = newPath
+                , pathString = Path.toString newPath
+            }
 
         _ ->
             model

@@ -12,12 +12,19 @@ SVG elements) by providing a visual editor and explanations of the commands.
 - Type in a [path definition](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/path) in the big input element at the bottom.
 - Click and drag the points of the path in the editor to edit the path (and path definition)
 - Shift + click on points to select multiple points at once, or shift + click on the canvas and then drag to start a selection
-- Use `Q`/`W` to zoom out/zoom in
+- Use `W`/`E` to zoom in/out
 - Use the arrow keys to pan around the canvas
-- Use the buttons or `Z`/`Shift + Z` to undo/redo (while your focus is not on the input)
-- Use `M`/`L` to enter Move/Line drawing mode (more command types coming soon!)
-  - In these drawing modes, clicking on the canvas will append the respective command to the path
-  - Use `X` to exit either drawing mode
+- Use the buttons or `U`/`R` to undo/redo (while your focus is not on the input)
+- Drawing Mode:
+  - Use each commands respective command letter to enter drawing mode for that command type
+    - e.g. `M` for Move, `L` for Line, `C` for CubicCurve, etc.
+    - Arc/Close not implemented yet
+  - In drawing modes, clicking on the canvas will build up the respective command point by point
+    - Move, Line, HorizontalLine, VerticalLine, and SmoothQuadraticCurve only require one point, the endpoint
+    - CubicCurve requires 3 points; the endpoint and start/end control points
+    - SmoothCubicCurve and QuadraticCurve require 2 points; the endpoint and a control point
+    - The segment will not appear until all the points are built up - step-by-step preview coming soon!
+  - Use `X` to exit drawing mode
 
 ### Building Locally
 
