@@ -898,8 +898,8 @@ update msg model =
                                 , hovered = model.path.hovered
                                 , selected =
                                     Path.selectionsWithin
-                                        (Debug.log "select" actualSelectStart)
-                                        (Debug.log "mouse" actualMouseOffset)
+                                        actualSelectStart
+                                        actualMouseOffset
                                         model.path
                                 }
                             , state = Neutral
