@@ -1629,9 +1629,9 @@ updateWithSelection path offset selection =
 
 type alias EndState =
     { endPoint : Point
-    , controlPoint : Point
-    , endControlPoint : Point
     , movePoint : Point
+    , endControlPoint : Point
+    , controlPoint : Point
     }
 
 
@@ -1639,8 +1639,8 @@ initEndState : EndState
 initEndState =
     { endPoint = Point.zero
     , movePoint = Point.zero
-    , controlPoint = Point.zero
     , endControlPoint = Point.zero
+    , controlPoint = Point.zero
     }
 
 
@@ -1651,43 +1651,43 @@ componentEndState component endState =
             { endState
                 | endPoint = params.to
                 , movePoint = params.to
-                , controlPoint = params.to
                 , endControlPoint = params.to
+                , controlPoint = params.to
             }
 
         LineSegment params ->
             { endState
                 | endPoint = params.to
-                , controlPoint = params.to
                 , endControlPoint = params.to
+                , controlPoint = params.to
             }
 
         CubicCurveSegment params ->
             { endState
                 | endPoint = params.to
-                , controlPoint = params.to
                 , endControlPoint = params.endControl
+                , controlPoint = params.to
             }
 
         QuadraticCurveSegment params ->
             { endState
                 | endPoint = params.to
-                , controlPoint = params.control
                 , endControlPoint = params.to
+                , controlPoint = params.control
             }
 
         ArcSegment params ->
             { endState
                 | endPoint = params.to
-                , controlPoint = params.to
                 , endControlPoint = params.to
+                , controlPoint = params.to
             }
 
         CloseSegment _ ->
             { endState
                 | endPoint = endState.movePoint
-                , controlPoint = endState.movePoint
                 , endControlPoint = endState.movePoint
+                , controlPoint = endState.movePoint
             }
 
 

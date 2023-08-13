@@ -1318,14 +1318,18 @@ viewSelectedPoints path =
     List.map viewSelectedPoint selectedPoints
 
 
-viewGhost : Model -> Point -> Path.Selection -> Svg Msg
-viewGhost model dragStart temporarySelection =
+viewDraggingPreview : Model -> Point -> Path.Selection -> Svg Msg
+viewDraggingPreview model dragStart temporarySelection =
     let
-        ghostPath : Path
-        ghostPath =
+        previewPath : Path
+        previewPath =
             Path.update
                 (Path.addSelection model.path temporarySelection)
                 (Point.subtract model.mouseOffset dragStart)
+
+        viewPreviewPath : Svg Msg
+        viewPreviewPath =
+            viewPath [] (Path.toString previewPath)
     in
     Svg.g
         [ SvgA.fill "none"
@@ -1335,7 +1339,7 @@ viewGhost model dragStart temporarySelection =
         , SvgA.opacity "0.5"
         , SvgA.cursor "grab"
         ]
-        (viewPath [] (Path.toString ghostPath) :: viewSelectedPoints ghostPath)
+        (viewPreviewPath :: viewSelectedPoints previewPath)
 
 
 viewSelectionBox : Model -> Point -> Svg Msg
@@ -1372,9 +1376,375 @@ viewSelectionBox model selectionStart =
         []
 
 
-viewDrawingState : Model -> DrawingState -> Svg Msg
-viewDrawingState model drawingState =
-    Svg.g [] []
+viewDrawingPreview : Model -> DrawingState -> Svg Msg
+viewDrawingPreview model drawingState =
+    let
+        endState : Path.EndState
+        endState =
+            Path.toEndState model.path
+
+        pathEndPointString : String
+        pathEndPointString =
+            Path.commandToString
+                (Path.preFormattedMove { to = endState.endPoint })
+
+        previewPoint : Point -> Svg Msg
+        previewPoint point =
+            viewPoint
+                [ SvgA.fill "black", SvgA.stroke "none", SvgA.r "1" ]
+                point
+
+        previewAttributes : List (Svg.Attribute Msg)
+        previewAttributes =
+            [ SvgA.fill "none"
+            , SvgA.stroke "black"
+            , SvgA.strokeWidth "0.5"
+            , SvgA.opacity "0.5"
+            ]
+    in
+    case drawingState of
+        DrawingMove ->
+            let
+                previewMoveString : String
+                previewMoveString =
+                    Path.commandToString
+                        (Path.preFormattedLine { to = model.mouseOffset })
+            in
+            Svg.g previewAttributes
+                [ viewPath
+                    [ SvgA.strokeDasharray "2 2" ]
+                    (pathEndPointString ++ previewMoveString)
+                , previewPoint model.mouseOffset
+                ]
+
+        DrawingLine ->
+            let
+                previewLineString : String
+                previewLineString =
+                    Path.commandToString
+                        (Path.preFormattedLine { to = model.mouseOffset })
+            in
+            Svg.g previewAttributes
+                [ viewPath [] (pathEndPointString ++ previewLineString)
+                , previewPoint model.mouseOffset
+                ]
+
+        DrawingHorizontalLine ->
+            let
+                previewHorizontalLineString : String
+                previewHorizontalLineString =
+                    Path.commandToString
+                        (Path.preFormattedHorizontalLine
+                            { toX = model.mouseOffset.x }
+                        )
+            in
+            Svg.g previewAttributes
+                [ viewPath
+                    []
+                    (pathEndPointString ++ previewHorizontalLineString)
+                , previewPoint
+                    { x = model.mouseOffset.x, y = endState.endPoint.y }
+                ]
+
+        DrawingVerticalLine ->
+            let
+                previewVerticalLineString : String
+                previewVerticalLineString =
+                    Path.commandToString
+                        (Path.preFormattedVerticalLine
+                            { toY = model.mouseOffset.y }
+                        )
+            in
+            Svg.g previewAttributes
+                [ viewPath [] (pathEndPointString ++ previewVerticalLineString)
+                , previewPoint
+                    { x = endState.endPoint.x, y = model.mouseOffset.y }
+                ]
+
+        DrawingCubicCurve drawingCubicCurveState ->
+            case drawingCubicCurveState of
+                DrawingCubicCurveTo ->
+                    let
+                        previewCubicCurveString : String
+                        previewCubicCurveString =
+                            Path.commandToString
+                                (Path.preFormattedCubicCurve
+                                    { to = model.mouseOffset
+                                    , startControl = model.mouseOffset
+                                    , endControl = model.mouseOffset
+                                    }
+                                )
+                    in
+                    Svg.g previewAttributes
+                        [ viewPath
+                            []
+                            (pathEndPointString ++ previewCubicCurveString)
+                        , previewPoint model.mouseOffset
+                        ]
+
+                DrawingStartControl { to } ->
+                    let
+                        previewCubicCurveString : String
+                        previewCubicCurveString =
+                            Path.commandToString
+                                (Path.preFormattedCubicCurve
+                                    { to = to
+                                    , startControl = model.mouseOffset
+                                    , endControl = to
+                                    }
+                                )
+
+                        previewStartControlString : String
+                        previewStartControlString =
+                            Path.commandToString
+                                (Path.preFormattedLine
+                                    { to = model.mouseOffset }
+                                )
+                    in
+                    Svg.g previewAttributes
+                        [ viewPath
+                            []
+                            (pathEndPointString ++ previewCubicCurveString)
+                        , viewPath
+                            []
+                            (pathEndPointString ++ previewStartControlString)
+                        , previewPoint to
+                        , previewPoint model.mouseOffset
+                        ]
+
+                DrawingEndControl { to, startControl } ->
+                    let
+                        previewCubicCurveString : String
+                        previewCubicCurveString =
+                            Path.commandToString
+                                (Path.preFormattedCubicCurve
+                                    { to = to
+                                    , startControl = startControl
+                                    , endControl = model.mouseOffset
+                                    }
+                                )
+
+                        previewEndPointString : String
+                        previewEndPointString =
+                            Path.commandToString
+                                (Path.preFormattedMove { to = to })
+
+                        previewStartControlString : String
+                        previewStartControlString =
+                            Path.commandToString
+                                (Path.preFormattedLine
+                                    { to = startControl }
+                                )
+
+                        previewEndControlString : String
+                        previewEndControlString =
+                            Path.commandToString
+                                (Path.preFormattedLine
+                                    { to = model.mouseOffset }
+                                )
+                    in
+                    Svg.g previewAttributes
+                        [ viewPath
+                            []
+                            (pathEndPointString ++ previewCubicCurveString)
+                        , viewPath
+                            []
+                            (pathEndPointString ++ previewStartControlString)
+                        , viewPath
+                            []
+                            (previewEndPointString ++ previewEndControlString)
+                        , previewPoint to
+                        , previewPoint startControl
+                        , previewPoint model.mouseOffset
+                        ]
+
+        DrawingSmoothCubicCurve drawingSmoothCubicCurveState ->
+            let
+                smoothStartControl : Point
+                smoothStartControl =
+                    Point.reflectOver
+                        endState.endPoint
+                        endState.endControlPoint
+            in
+            case drawingSmoothCubicCurveState of
+                DrawingOnePointCurveTo ->
+                    let
+                        previewCubicCurveString : String
+                        previewCubicCurveString =
+                            Path.commandToString
+                                (Path.preFormattedCubicCurve
+                                    { to = model.mouseOffset
+                                    , startControl = smoothStartControl
+                                    , endControl = model.mouseOffset
+                                    }
+                                )
+
+                        previewStartControlString : String
+                        previewStartControlString =
+                            Path.commandToString
+                                (Path.preFormattedLine
+                                    { to = smoothStartControl }
+                                )
+                    in
+                    Svg.g previewAttributes
+                        [ viewPath
+                            []
+                            (pathEndPointString ++ previewCubicCurveString)
+                        , viewPath
+                            []
+                            (pathEndPointString ++ previewStartControlString)
+                        , previewPoint model.mouseOffset
+                        , previewPoint smoothStartControl
+                        ]
+
+                DrawingControl { to } ->
+                    let
+                        previewCubicCurveString : String
+                        previewCubicCurveString =
+                            Path.commandToString
+                                (Path.preFormattedCubicCurve
+                                    { to = to
+                                    , startControl = smoothStartControl
+                                    , endControl = model.mouseOffset
+                                    }
+                                )
+
+                        previewEndPointString : String
+                        previewEndPointString =
+                            Path.commandToString
+                                (Path.preFormattedMove { to = to })
+
+                        previewStartControlString : String
+                        previewStartControlString =
+                            Path.commandToString
+                                (Path.preFormattedLine
+                                    { to = smoothStartControl }
+                                )
+
+                        previewEndControlString : String
+                        previewEndControlString =
+                            Path.commandToString
+                                (Path.preFormattedLine
+                                    { to = model.mouseOffset }
+                                )
+                    in
+                    Svg.g previewAttributes
+                        [ viewPath
+                            []
+                            (pathEndPointString ++ previewCubicCurveString)
+                        , viewPath
+                            []
+                            (pathEndPointString ++ previewStartControlString)
+                        , viewPath
+                            []
+                            (previewEndPointString ++ previewEndControlString)
+                        , previewPoint to
+                        , previewPoint smoothStartControl
+                        , previewPoint model.mouseOffset
+                        ]
+
+        DrawingQuadraticCurve drawingQuadraticCurve ->
+            case drawingQuadraticCurve of
+                DrawingOnePointCurveTo ->
+                    let
+                        previewQuadraticCurveString : String
+                        previewQuadraticCurveString =
+                            Path.commandToString
+                                (Path.preFormattedQuadraticCurve
+                                    { to = model.mouseOffset
+                                    , control = model.mouseOffset
+                                    }
+                                )
+                    in
+                    Svg.g previewAttributes
+                        [ viewPath
+                            []
+                            (pathEndPointString ++ previewQuadraticCurveString)
+                        , previewPoint model.mouseOffset
+                        ]
+
+                DrawingControl { to } ->
+                    let
+                        previewQuadraticCurveString : String
+                        previewQuadraticCurveString =
+                            Path.commandToString
+                                (Path.preFormattedQuadraticCurve
+                                    { to = to
+                                    , control = model.mouseOffset
+                                    }
+                                )
+
+                        previewEndPointString : String
+                        previewEndPointString =
+                            Path.commandToString
+                                (Path.preFormattedMove { to = to })
+
+                        previewControlString : String
+                        previewControlString =
+                            Path.commandToString
+                                (Path.preFormattedLine
+                                    { to = model.mouseOffset }
+                                )
+                    in
+                    Svg.g previewAttributes
+                        [ viewPath
+                            []
+                            (pathEndPointString ++ previewQuadraticCurveString)
+                        , viewPath
+                            []
+                            (pathEndPointString ++ previewControlString)
+                        , viewPath
+                            []
+                            (previewEndPointString ++ previewControlString)
+                        , previewPoint to
+                        , previewPoint model.mouseOffset
+                        ]
+
+        DrawingSmoothQuadraticCurve ->
+            let
+                smoothControl : Point
+                smoothControl =
+                    Point.reflectOver
+                        endState.endPoint
+                        endState.controlPoint
+
+                previewQuadraticCurveString : String
+                previewQuadraticCurveString =
+                    Path.commandToString
+                        (Path.preFormattedQuadraticCurve
+                            { to = model.mouseOffset
+                            , control = smoothControl
+                            }
+                        )
+
+                previewEndPointString : String
+                previewEndPointString =
+                    Path.commandToString
+                        (Path.preFormattedMove { to = model.mouseOffset })
+
+                previewControlString : String
+                previewControlString =
+                    Path.commandToString
+                        (Path.preFormattedLine
+                            { to = smoothControl }
+                        )
+            in
+            Svg.g previewAttributes
+                [ viewPath
+                    []
+                    (pathEndPointString ++ previewQuadraticCurveString)
+                , viewPath
+                    []
+                    (pathEndPointString ++ previewControlString)
+                , viewPath
+                    []
+                    (previewEndPointString ++ previewControlString)
+                , previewPoint model.mouseOffset
+                , previewPoint smoothControl
+                ]
+
+        _ ->
+            Svg.g [] []
 
 
 viewDefs : Svg Msg
@@ -1481,13 +1851,14 @@ viewCanvas model =
                     baseOverlay
 
                 Dragging { dragStart, temporarySelection } ->
-                    viewGhost model dragStart temporarySelection :: baseOverlay
+                    viewDraggingPreview model dragStart temporarySelection
+                        :: baseOverlay
 
                 Selecting selectionStart ->
                     viewSelectionBox model selectionStart :: baseOverlay
 
                 Drawing drawingState ->
-                    viewDrawingState model drawingState :: baseOverlay
+                    viewDrawingPreview model drawingState :: baseOverlay
     in
     Svg.svg
         [ SvgA.viewBox (ViewBox.toString model.viewBox)
@@ -1542,7 +1913,51 @@ stateToString state =
                 ]
 
         Drawing drawingState ->
-            "Drawing"
+            case drawingState of
+                DrawingMove ->
+                    "Drawing Move: "
+
+                DrawingLine ->
+                    "Drawing Line: "
+
+                DrawingHorizontalLine ->
+                    "Drawing Horizontal Line: "
+
+                DrawingVerticalLine ->
+                    "Drawing Vertical Line: "
+
+                DrawingCubicCurve drawingCubicCurveState ->
+                    case drawingCubicCurveState of
+                        DrawingCubicCurveTo ->
+                            "Drawing Cubic Curve - EndPoint: "
+
+                        DrawingStartControl _ ->
+                            "Drawing Cubic Curve - Start Control: "
+
+                        DrawingEndControl _ ->
+                            "Drawing Cubic Curve - End Control: "
+
+                DrawingSmoothCubicCurve drawingOnePointCurveState ->
+                    case drawingOnePointCurveState of
+                        DrawingOnePointCurveTo ->
+                            "Drawing Smooth Cubic Curve - EndPoint: "
+
+                        DrawingControl _ ->
+                            "Drawing Smooth Cubic Curve - End Control: "
+
+                DrawingQuadraticCurve drawingOnePointCurveState ->
+                    case drawingOnePointCurveState of
+                        DrawingOnePointCurveTo ->
+                            "Drawing Quadratic Curve - EndPoint: "
+
+                        DrawingControl _ ->
+                            "Drawing Quadratic Curve - End Control: "
+
+                DrawingSmoothQuadraticCurve ->
+                    "Drawing Smooth Quadratic Curve: "
+
+                DrawingArc _ ->
+                    "Drawing Arc: "
 
 
 viewViewBoxSize : ViewBox -> Float -> Html Msg
