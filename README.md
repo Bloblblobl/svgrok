@@ -1,6 +1,6 @@
 # svgrok - _to grok svg_
 
-[Click here to see it in action!](https://bloblblobl.github.io/svgrok/public/index.html)
+[Click here to see it in action!](https://bloblblobl.github.io/svgrok/)
 
 Svgrok is both an SVG path editor and a learning tool for SVG paths (currently
 more of the former and not much of the latter). It's a work in progress, but the
