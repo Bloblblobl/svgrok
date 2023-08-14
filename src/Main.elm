@@ -1090,14 +1090,72 @@ viewPoint attributes { x, y } =
     Svg.circle (pointAttributes ++ attributes) []
 
 
+viewArcRadiusLine : List (Attribute Msg) -> Point -> Point -> Svg Msg
+viewArcRadiusLine attributes centerPoint endPoint =
+    Svg.line
+        ([ SvgA.x1 (String.fromFloat centerPoint.x)
+         , SvgA.y1 (String.fromFloat centerPoint.y)
+         , SvgA.x2 (String.fromFloat endPoint.x)
+         , SvgA.y2 (String.fromFloat endPoint.y)
+         ]
+            ++ attributes
+        )
+        []
+
+
 viewArcControls : List (Attribute Msg) -> Path.ArcSegmentParameters -> Svg Msg
 viewArcControls attributes params =
     let
+        displayAttributes : List (Attribute Msg)
+        displayAttributes =
+            [ SvgA.stroke "black"
+            , SvgA.strokeWidth "0.25"
+            ]
+
+        adjustedDisplayAttributes : List (Attribute Msg)
+        adjustedDisplayAttributes =
+            SvgA.strokeDasharray "0.5 0.5" :: displayAttributes
+
         centerPoint : Point
         centerPoint =
             Path.arcSegmentCenterPoint params
+
+        radiusXEndPoint : Point
+        radiusXEndPoint =
+            Path.arcSegmentRadiusXEndPoint params False
+
+        radiusYEndPoint : Point
+        radiusYEndPoint =
+            Path.arcSegmentRadiusYEndPoint params False
+
+        adjustedRadiusXEndPoint : Point
+        adjustedRadiusXEndPoint =
+            Path.arcSegmentRadiusXEndPoint params True
+
+        adjustedRadiusYEndPoint : Point
+        adjustedRadiusYEndPoint =
+            Path.arcSegmentRadiusYEndPoint params True
     in
-    viewPoint attributes centerPoint
+    Svg.g
+        []
+        [ viewPoint attributes centerPoint
+        , viewArcRadiusLine
+            (displayAttributes ++ attributes)
+            centerPoint
+            radiusXEndPoint
+        , viewArcRadiusLine
+            (displayAttributes ++ attributes)
+            centerPoint
+            radiusYEndPoint
+        , viewArcRadiusLine
+            (adjustedDisplayAttributes ++ attributes)
+            centerPoint
+            adjustedRadiusXEndPoint
+        , viewArcRadiusLine
+            (adjustedDisplayAttributes ++ attributes)
+            centerPoint
+            adjustedRadiusYEndPoint
+        ]
 
 
 {-| Builds a Segment onto an OverlayBuilder by adding all of the relevant Points

@@ -2048,6 +2048,76 @@ arcSegmentCenterPoint params =
     { x = centerX, y = centerY }
 
 
+{-| Return the endpoint of an arc's X radius (or adjusted X radius, depending on
+isAdjusted) along the X-axis, rotated by the arc's rotation.
+-}
+arcSegmentRadiusXEndPoint : ArcSegmentParameters -> Bool -> Point
+arcSegmentRadiusXEndPoint params isAdjusted =
+    let
+        centerPoint : Point
+        centerPoint =
+            arcSegmentCenterPoint params
+
+        angleRadians : Float
+        angleRadians =
+            degrees params.angle
+
+        radii : Point
+        radii =
+            if isAdjusted then
+                arcSegmentAdjustedRadii params
+
+            else
+                params.radii
+
+        radiusXDelta : Point
+        radiusXDelta =
+            { x = cos angleRadians * radii.x
+            , y = sin angleRadians * radii.x
+            }
+
+        radiusXEndPoint : Point
+        radiusXEndPoint =
+            Point.add centerPoint radiusXDelta
+    in
+    radiusXEndPoint
+
+
+{-| Return the endpoint of an arc's Y radius (or adjusted Y radius, depending on
+isAdjusted) along the Y-axis, rotated by the arc's rotation.
+-}
+arcSegmentRadiusYEndPoint : ArcSegmentParameters -> Bool -> Point
+arcSegmentRadiusYEndPoint params isAdjusted =
+    let
+        centerPoint : Point
+        centerPoint =
+            arcSegmentCenterPoint params
+
+        angleRadians : Float
+        angleRadians =
+            degrees params.angle
+
+        radii : Point
+        radii =
+            if isAdjusted then
+                arcSegmentAdjustedRadii params
+
+            else
+                params.radii
+
+        radiusYDelta : Point
+        radiusYDelta =
+            { x = cos (angleRadians + degrees 90) * radii.y
+            , y = sin (angleRadians + degrees 90) * radii.y
+            }
+
+        radiusYEndPoint : Point
+        radiusYEndPoint =
+            Point.subtract centerPoint radiusYDelta
+    in
+    radiusYEndPoint
+
+
 
 -------------------------
 -- TO STRING FUNCTIONS --
