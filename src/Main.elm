@@ -80,6 +80,7 @@ type State
     | Dragging { dragStart : Point, temporarySelection : Path.Selection }
     | Selecting Point
     | Drawing DrawingState
+    | Typing
 
 
 type alias SavedModel =
@@ -211,6 +212,8 @@ type Msg
     | KeyUp KeyboardEvent
     | Undo
     | Redo
+    | PathStringInputFocused
+    | PathStringInputBlurred
 
 
 trackedKey : Key -> Bool
@@ -741,6 +744,9 @@ update msg model =
 
                         Drawing _ ->
                             model.state
+
+                        Typing ->
+                            model.state
             in
             ( { model
                 | mouseOffset =
@@ -778,6 +784,9 @@ update msg model =
                 Drawing _ ->
                     ( model, Cmd.none )
 
+                Typing ->
+                    ( model, Cmd.none )
+
         MouseDownCanvas ->
             case model.state of
                 Neutral ->
@@ -808,6 +817,9 @@ update msg model =
                     ( model, Cmd.none )
 
                 Drawing _ ->
+                    ( model, Cmd.none )
+
+                Typing ->
                     ( model, Cmd.none )
 
         MouseUp ->
@@ -910,6 +922,9 @@ update msg model =
                 Drawing drawingState ->
                     ( save (handleDraw model drawingState), Cmd.none )
 
+                Typing ->
+                    ( model, Cmd.none )
+
         SetCanDrag ->
             case model.state of
                 Neutral ->
@@ -933,8 +948,15 @@ update msg model =
                 Drawing _ ->
                     ( model, Cmd.none )
 
+                Typing ->
+                    ( model, Cmd.none )
+
         KeyDown keyboardEvent ->
-            ( handleKeyDown keyboardEvent model, Cmd.none )
+            if model.state == Typing then
+                ( model, Cmd.none )
+
+            else
+                ( handleKeyDown keyboardEvent model, Cmd.none )
 
         KeyUp { keyCode } ->
             case keyCode of
@@ -949,6 +971,21 @@ update msg model =
 
         Redo ->
             ( redo model, Cmd.none )
+
+        PathStringInputFocused ->
+            ( { model | state = Typing }, Cmd.none )
+
+        PathStringInputBlurred ->
+            let
+                newState : State
+                newState =
+                    if model.state == Typing then
+                        Neutral
+
+                    else
+                        model.state
+            in
+            ( { model | state = newState }, Cmd.none )
 
 
 
@@ -1000,6 +1037,10 @@ subscriptions model =
                 |> Sub.batch
 
         Drawing _ ->
+            baseSubscriptions
+                |> Sub.batch
+
+        Typing ->
             baseSubscriptions
                 |> Sub.batch
 
@@ -1933,6 +1974,9 @@ viewCanvas model =
 
                 Drawing drawingState ->
                     viewDrawingPreview model drawingState :: baseOverlay
+
+                Typing ->
+                    baseOverlay
     in
     Svg.svg
         [ SvgA.viewBox (ViewBox.toString model.viewBox)
@@ -2033,6 +2077,9 @@ stateToString state =
                 DrawingArc _ ->
                     "Drawing Arc: "
 
+        Typing ->
+            "Typing: "
+
 
 viewViewBoxSize : ViewBox -> Float -> Html Msg
 viewViewBoxSize viewBox zoomFactor =
@@ -2091,6 +2138,8 @@ viewPathStringInput pathString =
         [ Html.input
             [ HtmlA.value pathString
             , HtmlE.onInput PathStringChanged
+            , HtmlE.onFocus PathStringInputFocused
+            , HtmlE.onBlur PathStringInputBlurred
             , HtmlA.style "width" "100%"
             , HtmlA.style "font-size" "64px"
             ]
