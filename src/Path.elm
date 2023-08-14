@@ -1906,10 +1906,6 @@ direct implementation of equation F.6.6 found in the SVG specification:
 arcSegmentAdjustedRadii : ArcSegmentParameters -> Point
 arcSegmentAdjustedRadii params =
     let
-        angleRadians : Float
-        angleRadians =
-            degrees params.angle
-
         -- F.6.5.1
         transformedFrom : Point
         transformedFrom =
