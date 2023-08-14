@@ -4248,8 +4248,8 @@ function _Browser_getViewport()
 	return {
 		b$: _Browser_getScene(),
 		bB: {
-			J: _Browser_window.pageXOffset,
-			K: _Browser_window.pageYOffset,
+			D: _Browser_window.pageXOffset,
+			E: _Browser_window.pageYOffset,
 			aY: _Browser_doc.documentElement.clientWidth,
 			aP: _Browser_doc.documentElement.clientHeight
 		}
@@ -4290,8 +4290,8 @@ function _Browser_getViewportOf(id)
 				aP: node.scrollHeight
 			},
 			bB: {
-				J: node.scrollLeft,
-				K: node.scrollTop,
+				D: node.scrollLeft,
+				E: node.scrollTop,
 				aY: node.clientWidth,
 				aP: node.clientHeight
 			}
@@ -4325,14 +4325,14 @@ function _Browser_getElement(id)
 		return {
 			b$: _Browser_getScene(),
 			bB: {
-				J: x,
-				K: y,
+				D: x,
+				E: y,
 				aY: _Browser_doc.documentElement.clientWidth,
 				aP: _Browser_doc.documentElement.clientHeight
 			},
-			D: {
-				J: x + rect.left,
-				K: y + rect.top,
+			F: {
+				D: x + rect.left,
+				E: y + rect.top,
 				aY: rect.width,
 				aP: rect.height
 			}
@@ -4988,7 +4988,7 @@ var $elm$core$Array$treeFromBuilder = F2(
 	});
 var $elm$core$Array$builderToArray = F2(
 	function (reverseNodeList, builder) {
-		if (!builder.t) {
+		if (!builder.u) {
 			return A4(
 				$elm$core$Array$Array_elm_builtin,
 				$elm$core$Elm$JsArray$length(builder.x),
@@ -4996,11 +4996,11 @@ var $elm$core$Array$builderToArray = F2(
 				$elm$core$Elm$JsArray$empty,
 				builder.x);
 		} else {
-			var treeLen = builder.t * $elm$core$Array$branchFactor;
+			var treeLen = builder.u * $elm$core$Array$branchFactor;
 			var depth = $elm$core$Basics$floor(
 				A2($elm$core$Basics$logBase, $elm$core$Array$branchFactor, treeLen - 1));
 			var correctNodeList = reverseNodeList ? $elm$core$List$reverse(builder.y) : builder.y;
-			var tree = A2($elm$core$Array$treeFromBuilder, correctNodeList, builder.t);
+			var tree = A2($elm$core$Array$treeFromBuilder, correctNodeList, builder.u);
 			return A4(
 				$elm$core$Array$Array_elm_builtin,
 				$elm$core$Elm$JsArray$length(builder.x) + treeLen,
@@ -5019,7 +5019,7 @@ var $elm$core$Array$initializeHelp = F5(
 				return A2(
 					$elm$core$Array$builderToArray,
 					false,
-					{y: nodeList, t: (len / $elm$core$Array$branchFactor) | 0, x: tail});
+					{y: nodeList, u: (len / $elm$core$Array$branchFactor) | 0, x: tail});
 			} else {
 				var leaf = $elm$core$Array$Leaf(
 					A3($elm$core$Elm$JsArray$initialize, $elm$core$Array$branchFactor, fromIndex, fn));
@@ -5397,7 +5397,7 @@ var $author$project$Main$getInitialViewBoxFromViewport = function (zoomFactor) {
 		$elm$browser$Browser$Dom$getViewport);
 };
 var $author$project$Main$Neutral = {$: 0};
-var $author$project$Path$init = {z: _List_Nil, s: $elm$core$Maybe$Nothing, r: _List_Nil};
+var $author$project$Path$init = {z: _List_Nil, t: $elm$core$Maybe$Nothing, s: _List_Nil};
 var $author$project$ViewBox$init = {bD: 0, bE: 0, aP: 0, ac: 0, ad: 0, aY: 0};
 var $elm$svg$Svg$Attributes$cursor = _VirtualDom_attribute('cursor');
 var $elm$svg$Svg$Attributes$fill = _VirtualDom_attribute('fill');
@@ -5409,20 +5409,20 @@ var $author$project$Main$initOverlayConfig = {
 			$elm$svg$Svg$Attributes$fill('none'),
 			$elm$svg$Svg$Attributes$cursor('pointer')
 		]),
-	s: _List_fromArray(
+	t: _List_fromArray(
 		[
 			$elm$svg$Svg$Attributes$stroke('yellow'),
 			$elm$svg$Svg$Attributes$fill('none'),
 			$elm$svg$Svg$Attributes$cursor('pointer')
 		]),
-	r: _List_fromArray(
+	s: _List_fromArray(
 		[
 			$elm$svg$Svg$Attributes$stroke('blue'),
 			$elm$svg$Svg$Attributes$fill('none'),
 			$elm$svg$Svg$Attributes$cursor('grab')
 		])
 };
-var $author$project$Point$zero = {J: 0, K: 0};
+var $author$project$Point$zero = {D: 0, E: 0};
 var $author$project$Main$initModel = {Y: _List_Nil, ax: false, b: $author$project$Point$zero, aS: $author$project$Main$initOverlayConfig, c: $author$project$Path$init, o: '', T: _List_Nil, i: $author$project$Main$Neutral, N: _List_Nil, l: $author$project$ViewBox$init, X: 1};
 var $author$project$Main$init = function (_v0) {
 	return _Utils_Tuple2(
@@ -5779,7 +5779,7 @@ var $Gizra$elm_keyboard_event$Keyboard$Event$decodeKeyboardEvent = A8(
 	A2($elm$json$Json$Decode$field, 'shiftKey', $elm$json$Json$Decode$bool));
 var $author$project$Point$Point = F2(
 	function (x, y) {
-		return {J: x, K: y};
+		return {D: x, E: y};
 	});
 var $elm$json$Json$Decode$float = _Json_decodeFloat;
 var $author$project$Main$decodeMouseOffset = A3(
@@ -6463,7 +6463,7 @@ var $author$project$Main$Selecting = function (a) {
 };
 var $author$project$Point$add = F2(
 	function (point1, point2) {
-		return {J: point1.J + point2.J, K: point1.K + point2.K};
+		return {D: point1.D + point2.D, E: point1.E + point2.E};
 	});
 var $author$project$Main$Drawing = function (a) {
 	return {$: 4, a: a};
@@ -6509,7 +6509,7 @@ var $author$project$Path$QuadraticCurveSegment = function (a) {
 };
 var $author$project$Point$subtract = F2(
 	function (point1, point2) {
-		return {J: point1.J - point2.J, K: point1.K - point2.K};
+		return {D: point1.D - point2.D, E: point1.E - point2.E};
 	});
 var $author$project$Point$reflectOver = F2(
 	function (reflection, point) {
@@ -6582,14 +6582,14 @@ var $author$project$Path$appendCommand = F2(
 					return $author$project$Path$LineSegment(
 						{
 							a: endState.av,
-							f: (!command.h) ? {J: params.bx, K: endState.av.K} : {J: endState.av.J + params.bx, K: endState.av.K}
+							f: (!command.h) ? {D: params.bx, E: endState.av.E} : {D: endState.av.D + params.bx, E: endState.av.E}
 						});
 				case 3:
 					var params = _v0.a;
 					return $author$project$Path$LineSegment(
 						{
 							a: endState.av,
-							f: (!command.h) ? {J: endState.av.J, K: params.by} : {J: endState.av.J, K: endState.av.K + params.by}
+							f: (!command.h) ? {D: endState.av.D, E: params.by} : {D: endState.av.D, E: endState.av.E + params.by}
 						});
 				case 4:
 					var params = _v0.a;
@@ -6631,7 +6631,7 @@ var $author$project$Path$appendCommand = F2(
 						{
 							p: params.p,
 							a: endState.av,
-							u: params.u,
+							q: params.q,
 							v: params.v,
 							w: params.w,
 							f: (!command.h) ? params.f : A2($author$project$Point$add, endState.av, params.f)
@@ -6641,7 +6641,7 @@ var $author$project$Path$appendCommand = F2(
 						{a: endState.av, f: endState.aj});
 			}
 		}();
-		var newComponent = {q: command, af: newSegment};
+		var newComponent = {r: command, af: newSegment};
 		return _Utils_update(
 			path,
 			{
@@ -6659,7 +6659,7 @@ var $author$project$Path$Spaces = function (a) {
 	return {$: 0, a: a};
 };
 var $author$project$Path$defaultSeparator = $author$project$Path$Spaces(1);
-var $author$project$Path$defaultPointSeparator = {J: $author$project$Path$defaultSeparator, K: $author$project$Path$defaultSeparator};
+var $author$project$Path$defaultPointSeparator = {D: $author$project$Path$defaultSeparator, E: $author$project$Path$defaultSeparator};
 var $author$project$Path$preFormattedCubicCurve = function (params) {
 	return {
 		d: A2(
@@ -6816,10 +6816,10 @@ var $author$project$Path$pointToString = F2(
 		return $elm$core$String$concat(
 			_List_fromArray(
 				[
-					$elm$core$String$fromFloat(point.J),
-					$author$project$Path$separatorToString(separator.J),
-					$elm$core$String$fromFloat(point.K),
-					$author$project$Path$separatorToString(separator.K)
+					$elm$core$String$fromFloat(point.D),
+					$author$project$Path$separatorToString(separator.D),
+					$elm$core$String$fromFloat(point.E),
+					$author$project$Path$separatorToString(separator.E)
 				]));
 	});
 var $elm$core$String$toLower = _String_toLower;
@@ -6944,7 +6944,7 @@ var $author$project$Path$commandToString = function (_v0) {
 			var parameters = commandType.a;
 			var format = commandType.b;
 			var _v8 = parameters;
-			var radii = _v8.u;
+			var radii = _v8.q;
 			var angle = _v8.p;
 			var size = _v8.w;
 			var rotation = _v8.v;
@@ -6977,7 +6977,7 @@ var $author$project$Path$toString = function (_v0) {
 	var components = _v0.z;
 	var step = F2(
 		function (_v1, commandString) {
-			var command = _v1.q;
+			var command = _v1.r;
 			return _Utils_ap(
 				commandString,
 				$author$project$Path$commandToString(command));
@@ -7009,7 +7009,7 @@ var $author$project$Main$handleDraw = F2(
 					});
 			case 2:
 				var horizontalLineCommand = $author$project$Path$preFormattedHorizontalLine(
-					{bx: model.b.J});
+					{bx: model.b.D});
 				var newPath = A2($author$project$Path$appendCommand, model.c, horizontalLineCommand);
 				return _Utils_update(
 					model,
@@ -7019,7 +7019,7 @@ var $author$project$Main$handleDraw = F2(
 					});
 			case 3:
 				var verticalLineCommand = $author$project$Path$preFormattedVerticalLine(
-					{by: model.b.K});
+					{by: model.b.E});
 				var newPath = A2($author$project$Path$appendCommand, model.c, verticalLineCommand);
 				return _Utils_update(
 					model,
@@ -7179,7 +7179,7 @@ var $elm$core$List$head = function (list) {
 var $author$project$Main$savePath = function (path) {
 	return _Utils_update(
 		path,
-		{s: $elm$core$Maybe$Nothing, r: _List_Nil});
+		{t: $elm$core$Maybe$Nothing, s: _List_Nil});
 };
 var $author$project$Main$redo = function (model) {
 	var currentSavedModel = {
@@ -7192,7 +7192,7 @@ var $author$project$Main$redo = function (model) {
 		return _Utils_update(
 			model,
 			{
-				c: {z: savedModel.c.z, s: $elm$core$Maybe$Nothing, r: savedModel.c.r},
+				c: {z: savedModel.c.z, t: $elm$core$Maybe$Nothing, s: savedModel.c.s},
 				o: savedModel.o,
 				T: A2($elm$core$List$drop, 1, model.T),
 				N: A2($elm$core$List$cons, currentSavedModel, model.N)
@@ -7257,7 +7257,7 @@ var $author$project$Main$undo = function (model) {
 		return _Utils_update(
 			model,
 			{
-				c: {z: savedModel.c.z, s: $elm$core$Maybe$Nothing, r: savedModel.c.r},
+				c: {z: savedModel.c.z, t: $elm$core$Maybe$Nothing, s: savedModel.c.s},
 				o: savedModel.o,
 				T: A2($elm$core$List$cons, currentSavedModel, model.T),
 				N: A2($elm$core$List$drop, 1, model.N)
@@ -7459,13 +7459,13 @@ var $author$project$Path$buildComponent = F2(
 						return $author$project$Path$LineSegment(
 							{
 								a: currentPoint,
-								f: {J: toX, K: currentPoint.K}
+								f: {D: toX, E: currentPoint.E}
 							});
 					} else {
 						return $author$project$Path$LineSegment(
 							{
 								a: currentPoint,
-								f: {J: currentPoint.J + toX, K: currentPoint.K}
+								f: {D: currentPoint.D + toX, E: currentPoint.E}
 							});
 					}
 				case 3:
@@ -7474,13 +7474,13 @@ var $author$project$Path$buildComponent = F2(
 						return $author$project$Path$LineSegment(
 							{
 								a: currentPoint,
-								f: {J: currentPoint.J, K: toY}
+								f: {D: currentPoint.D, E: toY}
 							});
 					} else {
 						return $author$project$Path$LineSegment(
 							{
 								a: currentPoint,
-								f: {J: currentPoint.J, K: currentPoint.K + toY}
+								f: {D: currentPoint.D, E: currentPoint.E + toY}
 							});
 					}
 				case 4:
@@ -7522,7 +7522,7 @@ var $author$project$Path$buildComponent = F2(
 							f: absolute(to)
 						});
 				case 8:
-					var radii = commandType.a.u;
+					var radii = commandType.a.q;
 					var angle = commandType.a.p;
 					var size = commandType.a.w;
 					var rotation = commandType.a.v;
@@ -7531,7 +7531,7 @@ var $author$project$Path$buildComponent = F2(
 						{
 							p: angle,
 							a: currentPoint,
-							u: radii,
+							q: radii,
 							v: rotation,
 							w: size,
 							f: absolute(to)
@@ -7541,7 +7541,7 @@ var $author$project$Path$buildComponent = F2(
 						{a: currentPoint, f: firstConnectedPoint});
 			}
 		}();
-		var newComponent = {q: command, af: newSegment};
+		var newComponent = {r: command, af: newSegment};
 		var nextCurrentPoint = function () {
 			switch (newSegment.$) {
 				case 0:
@@ -7651,7 +7651,7 @@ var $author$project$Path$Parser$addValidResult = F3(
 var $author$project$Path$NoLetter = {$: 2};
 var $author$project$Path$Parser$FormattedArc = F5(
 	function (radii, angle, size, rotation, to) {
-		return {p: angle, u: radii, v: rotation, w: size, f: to};
+		return {p: angle, q: radii, v: rotation, w: size, f: to};
 	});
 var $author$project$Path$Clockwise = 0;
 var $author$project$Path$CounterClockwise = 1;
@@ -8164,7 +8164,7 @@ var $author$project$Path$Parser$formattedFloat = A2(
 	$author$project$Path$Parser$separator);
 var $author$project$Path$Parser$FormattedPoint = F4(
 	function (x, afterX, y, afterY) {
-		return {a$: afterX, a0: afterY, J: x, K: y};
+		return {a$: afterX, a0: afterY, D: x, E: y};
 	});
 var $author$project$Path$Parser$formattedPoint = A2(
 	$elm$parser$Parser$keeper,
@@ -8224,18 +8224,18 @@ var $author$project$Path$Parser$getFloatSeparator = function (_v0) {
 	return afterValue;
 };
 var $author$project$Path$Parser$getPoint = function (_v0) {
-	var x = _v0.J;
-	var y = _v0.K;
-	return {J: x, K: y};
+	var x = _v0.D;
+	var y = _v0.E;
+	return {D: x, E: y};
 };
 var $author$project$Path$Parser$getPointSeparator = function (_v0) {
 	var afterX = _v0.a$;
 	var afterY = _v0.a0;
-	return {J: afterX, K: afterY};
+	return {D: afterX, E: afterY};
 };
 var $author$project$Path$Parser$makeArc = F2(
 	function (sep, _v0) {
-		var radii = _v0.u;
+		var radii = _v0.q;
 		var angle = _v0.p;
 		var size = _v0.w;
 		var rotation = _v0.v;
@@ -8244,7 +8244,7 @@ var $author$project$Path$Parser$makeArc = F2(
 			$author$project$Path$ArcCommand,
 			{
 				p: $author$project$Path$Parser$getFloat(angle),
-				u: $author$project$Path$Parser$getPoint(radii),
+				q: $author$project$Path$Parser$getPoint(radii),
 				v: $author$project$Path$Parser$getArcRotation(rotation),
 				w: $author$project$Path$Parser$getArcSize(size),
 				f: $author$project$Path$Parser$getPoint(to)
@@ -9025,7 +9025,7 @@ var $author$project$Path$Parser$finishBuilder = function (_v0) {
 	}
 };
 var $author$project$Path$fromComponents = function (components) {
-	return {z: components, s: $elm$core$Maybe$Nothing, r: _List_Nil};
+	return {z: components, t: $elm$core$Maybe$Nothing, s: _List_Nil};
 };
 var $author$project$Path$Parser$resultToCommand = function (result) {
 	if (!result.$) {
@@ -9161,11 +9161,11 @@ var $author$project$ViewBox$scalePoint = F2(
 		var height = _v0.aP;
 		var actualWidth = _v0.bE;
 		var actualHeight = _v0.bD;
-		var x = _v1.J;
-		var y = _v1.K;
+		var x = _v1.D;
+		var y = _v1.E;
 		return {
-			J: A3($elm$core$Basics$composeL, $elm$core$Basics$toFloat, $elm$core$Basics$round, (x * width) / actualWidth),
-			K: A3($elm$core$Basics$composeL, $elm$core$Basics$toFloat, $elm$core$Basics$round, (y * height) / actualHeight)
+			D: A3($elm$core$Basics$composeL, $elm$core$Basics$toFloat, $elm$core$Basics$round, (x * width) / actualWidth),
+			E: A3($elm$core$Basics$composeL, $elm$core$Basics$toFloat, $elm$core$Basics$round, (y * height) / actualHeight)
 		};
 	});
 var $author$project$Path$Control = 3;
@@ -9178,11 +9178,11 @@ var $elm$core$Basics$min = F2(
 	});
 var $author$project$Point$withinBounds = F3(
 	function (point, bounds1, bounds2) {
-		var minY = A2($elm$core$Basics$min, bounds1.K, bounds2.K);
-		var minX = A2($elm$core$Basics$min, bounds1.J, bounds2.J);
-		var maxY = A2($elm$core$Basics$max, bounds1.K, bounds2.K);
-		var maxX = A2($elm$core$Basics$max, bounds1.J, bounds2.J);
-		return (_Utils_cmp(minX, point.J) < 1) && ((_Utils_cmp(point.J, maxX) < 1) && ((_Utils_cmp(minY, point.K) < 1) && (_Utils_cmp(point.K, maxY) < 1)));
+		var minY = A2($elm$core$Basics$min, bounds1.E, bounds2.E);
+		var minX = A2($elm$core$Basics$min, bounds1.D, bounds2.D);
+		var maxY = A2($elm$core$Basics$max, bounds1.E, bounds2.E);
+		var maxX = A2($elm$core$Basics$max, bounds1.D, bounds2.D);
+		return (_Utils_cmp(minX, point.D) < 1) && ((_Utils_cmp(point.D, maxX) < 1) && ((_Utils_cmp(minY, point.E) < 1) && (_Utils_cmp(point.E, maxY) < 1)));
 	});
 var $author$project$Path$componentSelectionsWithin = F4(
 	function (bounds1, bounds2, index, component) {
@@ -9195,13 +9195,13 @@ var $author$project$Path$componentSelectionsWithin = F4(
 				var to = _v0.a.f;
 				return withinBounds(to) ? _List_fromArray(
 					[
-						{D: 0, E: index}
+						{F: 0, G: index}
 					]) : _List_Nil;
 			case 1:
 				var to = _v0.a.f;
 				return withinBounds(to) ? _List_fromArray(
 					[
-						{D: 0, E: index}
+						{F: 0, G: index}
 					]) : _List_Nil;
 			case 2:
 				var startControl = _v0.a.U;
@@ -9212,15 +9212,15 @@ var $author$project$Path$componentSelectionsWithin = F4(
 						[
 							withinBounds(startControl) ? _List_fromArray(
 							[
-								{D: 1, E: index}
+								{F: 1, G: index}
 							]) : _List_Nil,
 							withinBounds(endControl) ? _List_fromArray(
 							[
-								{D: 2, E: index}
+								{F: 2, G: index}
 							]) : _List_Nil,
 							withinBounds(to) ? _List_fromArray(
 							[
-								{D: 0, E: index}
+								{F: 0, G: index}
 							]) : _List_Nil
 						]));
 			case 3:
@@ -9231,24 +9231,24 @@ var $author$project$Path$componentSelectionsWithin = F4(
 						[
 							withinBounds(control) ? _List_fromArray(
 							[
-								{D: 3, E: index}
+								{F: 3, G: index}
 							]) : _List_Nil,
 							withinBounds(to) ? _List_fromArray(
 							[
-								{D: 0, E: index}
+								{F: 0, G: index}
 							]) : _List_Nil
 						]));
 			case 4:
 				var to = _v0.a.f;
 				return withinBounds(to) ? _List_fromArray(
 					[
-						{D: 0, E: index}
+						{F: 0, G: index}
 					]) : _List_Nil;
 			default:
 				var to = _v0.a.f;
 				return withinBounds(to) ? _List_fromArray(
 					[
-						{D: 0, E: index}
+						{F: 0, G: index}
 					]) : _List_Nil;
 		}
 	});
@@ -9282,10 +9282,10 @@ var $author$project$Main$shiftPressed = function (model) {
 };
 var $author$project$Path$addSelection = F2(
 	function (path, selection) {
-		return A2($elm$core$List$member, selection, path.r) ? path : _Utils_update(
+		return A2($elm$core$List$member, selection, path.s) ? path : _Utils_update(
 			path,
 			{
-				r: A2($elm$core$List$cons, selection, path.r)
+				s: A2($elm$core$List$cons, selection, path.s)
 			});
 	});
 var $elm$core$List$filter = F2(
@@ -9306,14 +9306,14 @@ var $author$project$Path$removeSelection = F2(
 			function (s) {
 				return !_Utils_eq(s, selection);
 			},
-			path.r);
+			path.s);
 		return _Utils_update(
 			path,
-			{r: removedFromSelected});
+			{s: removedFromSelected});
 	});
 var $author$project$Path$toggleSelection = F2(
 	function (path, selection) {
-		return A2($elm$core$List$member, selection, path.r) ? A2($author$project$Path$removeSelection, path, selection) : A2($author$project$Path$addSelection, path, selection);
+		return A2($elm$core$List$member, selection, path.s) ? A2($author$project$Path$removeSelection, path, selection) : A2($author$project$Path$addSelection, path, selection);
 	});
 var $author$project$Main$unsetActiveKey = F2(
 	function (key, model) {
@@ -9335,18 +9335,18 @@ var $author$project$Path$initUpdateBuilder = F2(
 				h: 0
 			},
 			P: $author$project$Point$zero,
-			F: $author$project$Point$zero,
+			H: $author$project$Point$zero,
 			ao: $author$project$Point$zero,
 			R: offset,
-			r: selected,
+			s: selected,
 			C: _List_Nil
 		};
 	});
 var $author$project$Point$scale = F2(
 	function (factor, _v0) {
-		var x = _v0.J;
-		var y = _v0.K;
-		return {J: factor * x, K: factor * y};
+		var x = _v0.D;
+		var y = _v0.E;
+		return {D: factor * x, E: factor * y};
 	});
 var $author$project$Point$midpoint = F2(
 	function (point1, point2) {
@@ -9463,7 +9463,7 @@ var $author$project$Path$updateFormat = F2(
 	});
 var $author$project$Path$updateArc = F2(
 	function (_v0, params) {
-		var command = _v0.q;
+		var command = _v0.r;
 		var inSequence = A2($author$project$Path$commandInSequence, params.k, command);
 		var newCommand = function () {
 			var _v1 = _Utils_Tuple2(command.h, command.d);
@@ -9479,7 +9479,7 @@ var $author$project$Path$updateArc = F2(
 							{
 								d: A2(
 									$author$project$Path$ArcCommand,
-									{p: params.p, u: params.u, v: params.v, w: params.w, f: params.f},
+									{p: params.p, q: params.q, v: params.v, w: params.w, f: params.f},
 									A2($author$project$Path$updateFormat, format, inSequence))
 							});
 					} else {
@@ -9497,7 +9497,7 @@ var $author$project$Path$updateArc = F2(
 									$author$project$Path$ArcCommand,
 									{
 										p: params.p,
-										u: params.u,
+										q: params.q,
 										v: params.v,
 										w: params.w,
 										f: A2($author$project$Point$subtract, params.f, params.a)
@@ -9512,9 +9512,9 @@ var $author$project$Path$updateArc = F2(
 			return command;
 		}();
 		return {
-			q: newCommand,
+			r: newCommand,
 			af: $author$project$Path$ArcSegment(
-				{p: params.p, a: params.a, u: params.u, v: params.v, w: params.w, f: params.f})
+				{p: params.p, a: params.a, q: params.q, v: params.v, w: params.w, f: params.f})
 		};
 	});
 var $author$project$Path$defaultCubicCurveCommand = function (relation) {
@@ -9539,7 +9539,7 @@ var $author$project$Path$expandSmoothCubicFormat = function (_v0) {
 };
 var $author$project$Path$updateCubicCurve = F2(
 	function (_v0, params) {
-		var command = _v0.q;
+		var command = _v0.r;
 		var newStartControlOffset = A2($author$project$Point$subtract, params.U, params.a);
 		var newOffset = A2($author$project$Point$subtract, params.f, params.a);
 		var newEndControlOffset = A2($author$project$Point$subtract, params._, params.a);
@@ -9631,7 +9631,7 @@ var $author$project$Path$updateCubicCurve = F2(
 			return command;
 		}();
 		return {
-			q: newCommand,
+			r: newCommand,
 			af: $author$project$Path$CubicCurveSegment(
 				{_: params._, a: params.a, U: params.U, f: params.f})
 		};
@@ -9656,9 +9656,9 @@ var $author$project$Path$expandHorizontalFormat = function (_v0) {
 		m: _Utils_eq(
 			afterToX,
 			$author$project$Path$Spaces(0)) ? {
-			J: $author$project$Path$defaultSeparator,
-			K: $author$project$Path$Spaces(0)
-		} : {J: afterToX, K: afterToX}
+			D: $author$project$Path$defaultSeparator,
+			E: $author$project$Path$Spaces(0)
+		} : {D: afterToX, E: afterToX}
 	};
 };
 var $author$project$Path$expandVerticalFormat = function (_v0) {
@@ -9669,14 +9669,14 @@ var $author$project$Path$expandVerticalFormat = function (_v0) {
 		m: _Utils_eq(
 			afterToY,
 			$author$project$Path$Spaces(0)) ? {
-			J: $author$project$Path$defaultSeparator,
-			K: $author$project$Path$Spaces(0)
-		} : {J: afterToY, K: afterToY}
+			D: $author$project$Path$defaultSeparator,
+			E: $author$project$Path$Spaces(0)
+		} : {D: afterToY, E: afterToY}
 	};
 };
 var $author$project$Path$updateLine = F2(
 	function (_v0, params) {
-		var command = _v0.q;
+		var command = _v0.r;
 		var newOffset = A2($author$project$Point$subtract, params.f, params.a);
 		var inSequenceExpansion = A2(
 			$author$project$Path$commandInSequence,
@@ -9705,12 +9705,12 @@ var $author$project$Path$updateLine = F2(
 							var _v6 = _v1.a;
 							var _v7 = _v1.b;
 							var format = _v7.b;
-							return (!newOffset.K) ? _Utils_update(
+							return (!newOffset.E) ? _Utils_update(
 								command,
 								{
 									d: A2(
 										$author$project$Path$HorizontalLineCommand,
-										{bx: params.f.J},
+										{bx: params.f.D},
 										A2($author$project$Path$updateFormat, format, inSequence))
 								}) : _Utils_update(
 								command,
@@ -9725,12 +9725,12 @@ var $author$project$Path$updateLine = F2(
 							var _v10 = _v1.a;
 							var _v11 = _v1.b;
 							var format = _v11.b;
-							return (!newOffset.J) ? _Utils_update(
+							return (!newOffset.D) ? _Utils_update(
 								command,
 								{
 									d: A2(
 										$author$project$Path$VerticalLineCommand,
-										{by: params.f.K},
+										{by: params.f.E},
 										A2($author$project$Path$updateFormat, format, inSequence))
 								}) : _Utils_update(
 								command,
@@ -9762,12 +9762,12 @@ var $author$project$Path$updateLine = F2(
 							var _v8 = _v1.a;
 							var _v9 = _v1.b;
 							var format = _v9.b;
-							return (!newOffset.K) ? _Utils_update(
+							return (!newOffset.E) ? _Utils_update(
 								command,
 								{
 									d: A2(
 										$author$project$Path$HorizontalLineCommand,
-										{bx: newOffset.J},
+										{bx: newOffset.D},
 										A2($author$project$Path$updateFormat, format, inSequence))
 								}) : _Utils_update(
 								command,
@@ -9782,12 +9782,12 @@ var $author$project$Path$updateLine = F2(
 							var _v12 = _v1.a;
 							var _v13 = _v1.b;
 							var format = _v13.b;
-							return (!newOffset.J) ? _Utils_update(
+							return (!newOffset.D) ? _Utils_update(
 								command,
 								{
 									d: A2(
 										$author$project$Path$VerticalLineCommand,
-										{by: newOffset.K},
+										{by: newOffset.E},
 										A2($author$project$Path$updateFormat, format, inSequence))
 								}) : _Utils_update(
 								command,
@@ -9806,14 +9806,14 @@ var $author$project$Path$updateLine = F2(
 			return command;
 		}();
 		return {
-			q: newCommand,
+			r: newCommand,
 			af: $author$project$Path$LineSegment(
 				{a: params.a, f: params.f})
 		};
 	});
 var $author$project$Path$updateMove = F2(
 	function (_v0, params) {
-		var command = _v0.q;
+		var command = _v0.r;
 		var inSequence = A2($author$project$Path$commandInSequence, params.k, command);
 		var newCommand = function () {
 			var _v1 = _Utils_Tuple2(command.h, command.d);
@@ -9858,7 +9858,7 @@ var $author$project$Path$updateMove = F2(
 			return command;
 		}();
 		return {
-			q: newCommand,
+			r: newCommand,
 			af: $author$project$Path$MoveSegment(
 				{a: params.a, f: params.f})
 		};
@@ -9868,15 +9868,15 @@ var $author$project$Path$expandSmoothQuadraticFormat = function (_v0) {
 	var afterTo = _v0.m;
 	return {
 		ar: _Utils_eq(
-			afterTo.K,
-			$author$project$Path$Spaces(0)) ? {J: afterTo.J, K: $author$project$Path$defaultSeparator} : afterTo,
+			afterTo.E,
+			$author$project$Path$Spaces(0)) ? {D: afterTo.D, E: $author$project$Path$defaultSeparator} : afterTo,
 		g: afterLetter,
 		m: afterTo
 	};
 };
 var $author$project$Path$updateQuadraticCurve = F2(
 	function (_v0, params) {
-		var command = _v0.q;
+		var command = _v0.r;
 		var newOffset = A2($author$project$Point$subtract, params.f, params.a);
 		var newControlOffset = A2($author$project$Point$subtract, params.au, params.a);
 		var inSequenceExpansion = A2(
@@ -9967,7 +9967,7 @@ var $author$project$Path$updateQuadraticCurve = F2(
 			return command;
 		}();
 		return {
-			q: newCommand,
+			r: newCommand,
 			af: $author$project$Path$QuadraticCurveSegment(
 				{au: params.au, a: params.a, f: params.f})
 		};
@@ -9978,26 +9978,26 @@ var $author$project$Path$updateComponent = F2(
 		var component = _v0.b;
 		var updatingStartControl = A2(
 			$elm$core$List$member,
-			{D: 1, E: index},
-			builder.r);
+			{F: 1, G: index},
+			builder.s);
 		var updatingEndPoint = A2(
 			$elm$core$List$member,
-			{D: 0, E: index},
-			builder.r);
+			{F: 0, G: index},
+			builder.s);
 		var updatingEndControl = A2(
 			$elm$core$List$member,
-			{D: 2, E: index},
-			builder.r);
+			{F: 2, G: index},
+			builder.s);
 		var updatingControl = A2(
 			$elm$core$List$member,
-			{D: 3, E: index},
-			builder.r);
+			{F: 3, G: index},
+			builder.s);
 		var _v1 = component.af;
 		switch (_v1.$) {
 			case 0:
 				var params = _v1.a;
 				var newParams = {
-					a: builder.F,
+					a: builder.H,
 					k: builder.k,
 					f: updatingEndPoint ? A2($author$project$Point$add, params.f, builder.R) : params.f
 				};
@@ -10005,16 +10005,16 @@ var $author$project$Path$updateComponent = F2(
 				return _Utils_update(
 					builder,
 					{
-						k: updatedComponent.q,
+						k: updatedComponent.r,
 						P: newParams.f,
-						F: newParams.f,
+						H: newParams.f,
 						ao: newParams.f,
 						C: A2($elm$core$List$cons, updatedComponent, builder.C)
 					});
 			case 1:
 				var params = _v1.a;
 				var newParams = {
-					a: builder.F,
+					a: builder.H,
 					k: builder.k,
 					f: updatingEndPoint ? A2($author$project$Point$add, params.f, builder.R) : params.f
 				};
@@ -10022,16 +10022,16 @@ var $author$project$Path$updateComponent = F2(
 				return _Utils_update(
 					builder,
 					{
-						k: updatedComponent.q,
+						k: updatedComponent.r,
 						P: newParams.f,
-						F: newParams.f,
+						H: newParams.f,
 						C: A2($elm$core$List$cons, updatedComponent, builder.C)
 					});
 			case 2:
 				var params = _v1.a;
 				var newParams = {
 					_: updatingEndControl ? A2($author$project$Point$add, params._, builder.R) : params._,
-					a: builder.F,
+					a: builder.H,
 					aa: A3($author$project$Point$isReflectionOver, params.a, params.U, builder.P),
 					k: builder.k,
 					U: updatingStartControl ? A2($author$project$Point$add, params.U, builder.R) : params.U,
@@ -10041,16 +10041,16 @@ var $author$project$Path$updateComponent = F2(
 				return _Utils_update(
 					builder,
 					{
-						k: updatedComponent.q,
+						k: updatedComponent.r,
 						P: newParams._,
-						F: newParams.f,
+						H: newParams.f,
 						C: A2($elm$core$List$cons, updatedComponent, builder.C)
 					});
 			case 3:
 				var params = _v1.a;
 				var newParams = {
 					au: updatingControl ? A2($author$project$Point$add, params.au, builder.R) : params.au,
-					a: builder.F,
+					a: builder.H,
 					aa: A3($author$project$Point$isReflectionOver, params.a, params.au, builder.P),
 					k: builder.k,
 					f: updatingEndPoint ? A2($author$project$Point$add, params.f, builder.R) : params.f
@@ -10059,18 +10059,18 @@ var $author$project$Path$updateComponent = F2(
 				return _Utils_update(
 					builder,
 					{
-						k: updatedComponent.q,
+						k: updatedComponent.r,
 						P: newParams.au,
-						F: newParams.f,
+						H: newParams.f,
 						C: A2($elm$core$List$cons, updatedComponent, builder.C)
 					});
 			case 4:
 				var params = _v1.a;
 				var newParams = {
 					p: params.p,
-					a: builder.F,
+					a: builder.H,
 					k: builder.k,
-					u: params.u,
+					q: params.q,
 					v: params.v,
 					w: params.w,
 					f: updatingEndPoint ? A2($author$project$Point$add, params.f, builder.R) : params.f
@@ -10079,9 +10079,9 @@ var $author$project$Path$updateComponent = F2(
 				return _Utils_update(
 					builder,
 					{
-						k: updatedComponent.q,
+						k: updatedComponent.r,
 						P: newParams.f,
-						F: newParams.f,
+						H: newParams.f,
 						C: A2($elm$core$List$cons, updatedComponent, builder.C)
 					});
 			default:
@@ -10089,14 +10089,14 @@ var $author$project$Path$updateComponent = F2(
 					component,
 					{
 						af: $author$project$Path$CloseSegment(
-							{a: builder.F, f: builder.ao})
+							{a: builder.H, f: builder.ao})
 					});
 				return _Utils_update(
 					builder,
 					{
-						k: updatedComponent.q,
+						k: updatedComponent.r,
 						P: builder.ao,
-						F: builder.ao,
+						H: builder.ao,
 						C: A2($elm$core$List$cons, updatedComponent, builder.C)
 					});
 		}
@@ -10106,7 +10106,7 @@ var $author$project$Path$update = F2(
 		var updatedBuilder = A3(
 			$elm$core$List$foldl,
 			$author$project$Path$updateComponent,
-			A2($author$project$Path$initUpdateBuilder, path.r, offset),
+			A2($author$project$Path$initUpdateBuilder, path.s, offset),
 			A2($elm$core$List$indexedMap, $elm$core$Tuple$pair, path.z));
 		var updatedComponents = $elm$core$List$reverse(updatedBuilder.C);
 		return _Utils_update(
@@ -10166,7 +10166,7 @@ var $author$project$Main$update = F2(
 						{
 							c: _Utils_update(
 								path,
-								{s: selection})
+								{t: selection})
 						}),
 					$elm$core$Platform$Cmd$none);
 			case 4:
@@ -10197,7 +10197,7 @@ var $author$project$Main$update = F2(
 							b: A2(
 								$author$project$Point$add,
 								A2($author$project$ViewBox$scalePoint, model.l, newOffset),
-								{J: model.l.ac, K: model.l.ad}),
+								{D: model.l.ac, E: model.l.ad}),
 							i: newState
 						}),
 					$elm$core$Platform$Cmd$none);
@@ -10238,7 +10238,7 @@ var $author$project$Main$update = F2(
 								_Utils_update(
 									model,
 									{
-										c: {z: model.c.z, s: model.c.s, r: _List_Nil}
+										c: {z: model.c.z, t: model.c.t, s: _List_Nil}
 									})),
 							$elm$core$Platform$Cmd$none);
 					case 1:
@@ -10259,8 +10259,8 @@ var $author$project$Main$update = F2(
 						var temporarySelection = _v5.a.ag;
 						var newPath = $author$project$Main$shiftPressed(model) ? A2($author$project$Path$toggleSelection, model.c, temporarySelection) : {
 							z: model.c.z,
-							s: model.c.s,
-							r: A2($elm$core$List$member, temporarySelection, model.c.r) ? _List_Nil : _List_fromArray(
+							t: model.c.t,
+							s: A2($elm$core$List$member, temporarySelection, model.c.s) ? _List_Nil : _List_fromArray(
 								[temporarySelection])
 						};
 						return _Utils_Tuple2(
@@ -10273,7 +10273,7 @@ var $author$project$Main$update = F2(
 						var dragStart = _v5.a.aH;
 						var temporarySelection = _v5.a.ag;
 						var dragOffset = A2($author$project$Point$subtract, model.b, dragStart);
-						var alreadySelected = A2($elm$core$List$member, temporarySelection, model.c.r);
+						var alreadySelected = A2($elm$core$List$member, temporarySelection, model.c.s);
 						var newPath = alreadySelected ? A2($author$project$Path$update, model.c, dragOffset) : A3($author$project$Path$updateWithSelection, model.c, dragOffset, temporarySelection);
 						var newPathString = $author$project$Path$toString(newPath);
 						return _Utils_Tuple2(
@@ -10284,7 +10284,7 @@ var $author$project$Main$update = F2(
 							$elm$core$Platform$Cmd$none);
 					case 3:
 						var selectStart = _v5.a;
-						var viewBoxOffset = {J: model.l.ac, K: model.l.ad};
+						var viewBoxOffset = {D: model.l.ac, E: model.l.ad};
 						var actualSelectStart = A2($author$project$Point$add, selectStart, viewBoxOffset);
 						var actualMouseOffset = A2($author$project$Point$add, model.b, viewBoxOffset);
 						return _Utils_Tuple2(
@@ -10294,8 +10294,8 @@ var $author$project$Main$update = F2(
 									{
 										c: {
 											z: model.c.z,
-											s: model.c.s,
-											r: A3($author$project$Path$selectionsWithin, actualSelectStart, actualMouseOffset, model.c)
+											t: model.c.t,
+											s: A3($author$project$Path$selectionsWithin, actualSelectStart, actualMouseOffset, model.c)
 										},
 										i: $author$project$Main$Neutral
 									})),
@@ -10581,8 +10581,8 @@ var $elm$svg$Svg$Attributes$cx = _VirtualDom_attribute('cx');
 var $elm$svg$Svg$Attributes$cy = _VirtualDom_attribute('cy');
 var $author$project$Main$viewPoint = F2(
 	function (attributes, _v0) {
-		var x = _v0.J;
-		var y = _v0.K;
+		var x = _v0.D;
+		var y = _v0.E;
 		var pointAttributes = _List_fromArray(
 			[
 				$elm$svg$Svg$Attributes$cx(
@@ -10606,7 +10606,7 @@ var $author$project$Main$viewSelectedPoints = function (path) {
 			]));
 	var makeSelection = F2(
 		function (index, element) {
-			return {D: element, E: index};
+			return {F: element, G: index};
 		});
 	var possibleSelections = function (index) {
 		return A2(
@@ -10619,7 +10619,7 @@ var $author$project$Main$viewSelectedPoints = function (path) {
 		return A2(
 			$elm$core$List$any,
 			function (selection) {
-				return A2($elm$core$List$member, selection, path.r);
+				return A2($elm$core$List$member, selection, path.s);
 			},
 			possibleSelections(index));
 	};
@@ -10722,7 +10722,7 @@ var $author$project$Main$viewDrawingPreview = F2(
 			case 2:
 				var previewHorizontalLineString = $author$project$Path$commandToString(
 					$author$project$Path$preFormattedHorizontalLine(
-						{bx: model.b.J}));
+						{bx: model.b.D}));
 				return A2(
 					$elm$svg$Svg$g,
 					previewAttributes,
@@ -10733,12 +10733,12 @@ var $author$project$Main$viewDrawingPreview = F2(
 							_List_Nil,
 							_Utils_ap(pathEndPointString, previewHorizontalLineString)),
 							previewPoint(
-							{J: model.b.J, K: endState.av.K})
+							{D: model.b.D, E: endState.av.E})
 						]));
 			case 3:
 				var previewVerticalLineString = $author$project$Path$commandToString(
 					$author$project$Path$preFormattedVerticalLine(
-						{by: model.b.K}));
+						{by: model.b.E}));
 				return A2(
 					$elm$svg$Svg$g,
 					previewAttributes,
@@ -10749,7 +10749,7 @@ var $author$project$Main$viewDrawingPreview = F2(
 							_List_Nil,
 							_Utils_ap(pathEndPointString, previewVerticalLineString)),
 							previewPoint(
-							{J: endState.av.J, K: model.b.K})
+							{D: endState.av.D, E: model.b.E})
 						]));
 			case 4:
 				var drawingCubicCurveState = drawingState.a;
@@ -10983,8 +10983,8 @@ var $author$project$Path$pointToStringNoSpace = function (point) {
 		' ',
 		_List_fromArray(
 			[
-				$elm$core$String$fromFloat(point.J),
-				$elm$core$String$fromFloat(point.K)
+				$elm$core$String$fromFloat(point.D),
+				$elm$core$String$fromFloat(point.E)
 			]));
 };
 var $author$project$Path$pointToStringOneSpace = function (point) {
@@ -10993,8 +10993,8 @@ var $author$project$Path$pointToStringOneSpace = function (point) {
 		' ',
 		_List_fromArray(
 			[
-				$elm$core$String$fromFloat(point.J),
-				$elm$core$String$fromFloat(point.K),
+				$elm$core$String$fromFloat(point.D),
+				$elm$core$String$fromFloat(point.E),
 				''
 			]));
 };
@@ -11040,7 +11040,7 @@ var $author$project$Path$segmentToString = function (segment) {
 						$author$project$Path$pointToStringNoSpace(to)
 					]));
 		case 4:
-			var radii = segment.a.u;
+			var radii = segment.a.q;
 			var angle = segment.a.p;
 			var size = segment.a.w;
 			var rotation = segment.a.v;
@@ -11096,8 +11096,8 @@ var $author$project$Main$selectionMouseEvents = function (selection) {
 var $author$project$Main$selectionAttributes = F2(
 	function (_v0, selection) {
 		var config = _v0.aO;
-		var hovered = _v0.s;
-		var selected = _v0.r;
+		var hovered = _v0.t;
+		var selected = _v0.s;
 		var isSelected = A2($elm$core$List$member, selection, selected);
 		var isHovered = function () {
 			if (!hovered.$) {
@@ -11110,7 +11110,7 @@ var $author$project$Main$selectionAttributes = F2(
 		return A2(
 			$elm$core$List$append,
 			$author$project$Main$selectionMouseEvents(selection),
-			isSelected ? config.r : (isHovered ? config.s : config.aG));
+			isSelected ? config.s : (isHovered ? config.t : config.aG));
 	});
 var $elm$core$Basics$abs = function (n) {
 	return (n < 0) ? (-n) : n;
@@ -11122,32 +11122,32 @@ var $elm$core$Basics$degrees = function (angleInDegrees) {
 };
 var $elm$core$Basics$sin = _Basics_sin;
 var $author$project$Path$arcSegmentTransformedFrom = function (params) {
-	var halfDiffY = (params.a.K - params.f.K) / 2;
-	var halfDiffX = (params.a.J - params.f.J) / 2;
+	var halfDiffY = (params.a.E - params.f.E) / 2;
+	var halfDiffX = (params.a.D - params.f.D) / 2;
 	var angleRadians = $elm$core$Basics$degrees(params.p);
 	var transformedX = ($elm$core$Basics$cos(angleRadians) * halfDiffX) + ($elm$core$Basics$sin(angleRadians) * halfDiffY);
 	var transformedY = ((-$elm$core$Basics$sin(angleRadians)) * halfDiffX) + ($elm$core$Basics$cos(angleRadians) * halfDiffY);
-	return {J: transformedX, K: transformedY};
+	return {D: transformedX, E: transformedY};
 };
 var $elm$core$Basics$pow = _Basics_pow;
 var $elm$core$Basics$sqrt = _Basics_sqrt;
 var $author$project$Path$arcSegmentAdjustedRadii = function (params) {
 	var transformedFrom = $author$project$Path$arcSegmentTransformedFrom(params);
 	var angleRadians = $elm$core$Basics$degrees(params.p);
-	var absRY = $elm$core$Basics$abs(params.u.K);
-	var lambdaY = A2($elm$core$Basics$pow, transformedFrom.K, 2) / A2($elm$core$Basics$pow, absRY, 2);
-	var absRX = $elm$core$Basics$abs(params.u.J);
-	var lambdaX = A2($elm$core$Basics$pow, transformedFrom.J, 2) / A2($elm$core$Basics$pow, absRX, 2);
+	var absRY = $elm$core$Basics$abs(params.q.E);
+	var lambdaY = A2($elm$core$Basics$pow, transformedFrom.E, 2) / A2($elm$core$Basics$pow, absRY, 2);
+	var absRX = $elm$core$Basics$abs(params.q.D);
+	var lambdaX = A2($elm$core$Basics$pow, transformedFrom.D, 2) / A2($elm$core$Basics$pow, absRX, 2);
 	var lambda = lambdaX + lambdaY;
-	return (lambda <= 1) ? {J: absRX, K: absRY} : {
-		J: $elm$core$Basics$sqrt(lambda) * absRX,
-		K: $elm$core$Basics$sqrt(lambda) * absRY
+	return (lambda <= 1) ? {D: absRX, E: absRY} : {
+		D: $elm$core$Basics$sqrt(lambda) * absRX,
+		E: $elm$core$Basics$sqrt(lambda) * absRY
 	};
 };
 var $author$project$Path$arcSegmentCenterPoint = function (params) {
 	var transformedFrom = $author$project$Path$arcSegmentTransformedFrom(params);
-	var halfSumY = (params.a.K + params.f.K) / 2;
-	var halfSumX = (params.a.J + params.f.J) / 2;
+	var halfSumY = (params.a.E + params.f.E) / 2;
+	var halfSumX = (params.a.D + params.f.D) / 2;
 	var coefficientSign = function () {
 		var _v0 = _Utils_Tuple2(params.w, params.v);
 		if (!_v0.a) {
@@ -11174,24 +11174,108 @@ var $author$project$Path$arcSegmentCenterPoint = function (params) {
 	}();
 	var angleRadians = $elm$core$Basics$degrees(params.p);
 	var adjustedRadii = $author$project$Path$arcSegmentAdjustedRadii(params);
-	var rX = adjustedRadii.J;
-	var rXtY = A2($elm$core$Basics$pow, rX, 2) * A2($elm$core$Basics$pow, transformedFrom.K, 2);
-	var rY = adjustedRadii.K;
-	var rYtX = A2($elm$core$Basics$pow, rY, 2) * A2($elm$core$Basics$pow, transformedFrom.J, 2);
+	var rX = adjustedRadii.D;
+	var rXtY = A2($elm$core$Basics$pow, rX, 2) * A2($elm$core$Basics$pow, transformedFrom.E, 2);
+	var rY = adjustedRadii.E;
+	var rYtX = A2($elm$core$Basics$pow, rY, 2) * A2($elm$core$Basics$pow, transformedFrom.D, 2);
 	var coefficientDenominator = rXtY + rYtX;
 	var coefficientNumerator = ((A2($elm$core$Basics$pow, rX, 2) * A2($elm$core$Basics$pow, rY, 2)) - rXtY) - rYtX;
 	var adjustedCoefficientNumerator = A2($elm$core$Basics$max, 0, coefficientNumerator);
 	var coefficient = coefficientSign * $elm$core$Basics$sqrt(adjustedCoefficientNumerator / coefficientDenominator);
-	var tcX = coefficient * ((rX * transformedFrom.K) / rY);
-	var tcY = coefficient * (-((rY * transformedFrom.J) / rX));
+	var tcX = coefficient * ((rX * transformedFrom.E) / rY);
+	var tcY = coefficient * (-((rY * transformedFrom.D) / rX));
 	var centerX = (($elm$core$Basics$cos(angleRadians) * tcX) - ($elm$core$Basics$sin(angleRadians) * tcY)) + halfSumX;
 	var centerY = (($elm$core$Basics$sin(angleRadians) * tcX) + ($elm$core$Basics$cos(angleRadians) * tcY)) + halfSumY;
-	return {J: centerX, K: centerY};
+	return {D: centerX, E: centerY};
 };
+var $author$project$Path$arcSegmentRadiusXEndPoint = F2(
+	function (params, isAdjusted) {
+		var radii = isAdjusted ? $author$project$Path$arcSegmentAdjustedRadii(params) : params.q;
+		var centerPoint = $author$project$Path$arcSegmentCenterPoint(params);
+		var angleRadians = $elm$core$Basics$degrees(params.p);
+		var radiusXDelta = {
+			D: $elm$core$Basics$cos(angleRadians) * radii.D,
+			E: $elm$core$Basics$sin(angleRadians) * radii.D
+		};
+		var radiusXEndPoint = A2($author$project$Point$add, centerPoint, radiusXDelta);
+		return radiusXEndPoint;
+	});
+var $author$project$Path$arcSegmentRadiusYEndPoint = F2(
+	function (params, isAdjusted) {
+		var radii = isAdjusted ? $author$project$Path$arcSegmentAdjustedRadii(params) : params.q;
+		var centerPoint = $author$project$Path$arcSegmentCenterPoint(params);
+		var angleRadians = $elm$core$Basics$degrees(params.p);
+		var radiusYDelta = {
+			D: $elm$core$Basics$cos(
+				angleRadians + $elm$core$Basics$degrees(90)) * radii.E,
+			E: $elm$core$Basics$sin(
+				angleRadians + $elm$core$Basics$degrees(90)) * radii.E
+		};
+		var radiusYEndPoint = A2($author$project$Point$subtract, centerPoint, radiusYDelta);
+		return radiusYEndPoint;
+	});
+var $author$project$Main$viewArcRadiusLine = F3(
+	function (attributes, centerPoint, endPoint) {
+		return A2(
+			$elm$svg$Svg$line,
+			_Utils_ap(
+				_List_fromArray(
+					[
+						$elm$svg$Svg$Attributes$x1(
+						$elm$core$String$fromFloat(centerPoint.D)),
+						$elm$svg$Svg$Attributes$y1(
+						$elm$core$String$fromFloat(centerPoint.E)),
+						$elm$svg$Svg$Attributes$x2(
+						$elm$core$String$fromFloat(endPoint.D)),
+						$elm$svg$Svg$Attributes$y2(
+						$elm$core$String$fromFloat(endPoint.E))
+					]),
+				attributes),
+			_List_Nil);
+	});
 var $author$project$Main$viewArcControls = F2(
 	function (attributes, params) {
+		var radiusYEndPoint = A2($author$project$Path$arcSegmentRadiusYEndPoint, params, false);
+		var radiusXEndPoint = A2($author$project$Path$arcSegmentRadiusXEndPoint, params, false);
+		var displayAttributes = _List_fromArray(
+			[
+				$elm$svg$Svg$Attributes$stroke('black'),
+				$elm$svg$Svg$Attributes$strokeWidth('0.25')
+			]);
 		var centerPoint = $author$project$Path$arcSegmentCenterPoint(params);
-		return A2($author$project$Main$viewPoint, attributes, centerPoint);
+		var adjustedRadiusYEndPoint = A2($author$project$Path$arcSegmentRadiusYEndPoint, params, true);
+		var adjustedRadiusXEndPoint = A2($author$project$Path$arcSegmentRadiusXEndPoint, params, true);
+		var adjustedDisplayAttributes = A2(
+			$elm$core$List$cons,
+			$elm$svg$Svg$Attributes$strokeDasharray('0.5 0.5'),
+			displayAttributes);
+		return A2(
+			$elm$svg$Svg$g,
+			_List_Nil,
+			_List_fromArray(
+				[
+					A2($author$project$Main$viewPoint, attributes, centerPoint),
+					A3(
+					$author$project$Main$viewArcRadiusLine,
+					_Utils_ap(displayAttributes, attributes),
+					centerPoint,
+					radiusXEndPoint),
+					A3(
+					$author$project$Main$viewArcRadiusLine,
+					_Utils_ap(displayAttributes, attributes),
+					centerPoint,
+					radiusYEndPoint),
+					A3(
+					$author$project$Main$viewArcRadiusLine,
+					_Utils_ap(adjustedDisplayAttributes, attributes),
+					centerPoint,
+					adjustedRadiusXEndPoint),
+					A3(
+					$author$project$Main$viewArcRadiusLine,
+					_Utils_ap(adjustedDisplayAttributes, attributes),
+					centerPoint,
+					adjustedRadiusYEndPoint)
+				]));
 	});
 var $author$project$Main$buildSegment = F2(
 	function (_v0, builder) {
@@ -11201,7 +11285,7 @@ var $author$project$Main$buildSegment = F2(
 		switch (_v1.$) {
 			case 0:
 				var to = _v1.a.f;
-				var selection = {D: 0, E: index};
+				var selection = {F: 0, G: index};
 				var endPoint = A2(
 					$author$project$Main$viewPoint,
 					A2($author$project$Main$selectionAttributes, builder, selection),
@@ -11209,16 +11293,16 @@ var $author$project$Main$buildSegment = F2(
 				return _Utils_update(
 					builder,
 					{
-						H: A2($elm$core$List$cons, endPoint, builder.H)
+						J: A2($elm$core$List$cons, endPoint, builder.J)
 					});
 			case 1:
 				var to = _v1.a.f;
-				var segmentSelection = {D: 4, E: index};
+				var segmentSelection = {F: 4, G: index};
 				var lineSegment = A2(
 					$author$project$Main$viewPath,
 					A2($author$project$Main$selectionAttributes, builder, segmentSelection),
 					$author$project$Path$segmentToString(component.af));
-				var endSelection = {D: 0, E: index};
+				var endSelection = {F: 0, G: index};
 				var endPoint = A2(
 					$author$project$Main$viewPoint,
 					A2($author$project$Main$selectionAttributes, builder, endSelection),
@@ -11226,21 +11310,21 @@ var $author$project$Main$buildSegment = F2(
 				return _Utils_update(
 					builder,
 					{
-						H: A2($elm$core$List$cons, endPoint, builder.H),
-						I: A2($elm$core$List$cons, lineSegment, builder.I)
+						J: A2($elm$core$List$cons, endPoint, builder.J),
+						K: A2($elm$core$List$cons, lineSegment, builder.K)
 					});
 			case 2:
 				var startControl = _v1.a.U;
 				var endControl = _v1.a._;
 				var to = _v1.a.f;
-				var startSelection = {D: 1, E: index};
+				var startSelection = {F: 1, G: index};
 				var startControlPoint = A2(
 					$author$project$Main$viewPoint,
 					A2($author$project$Main$selectionAttributes, builder, startSelection),
 					startControl);
-				var segmentSelection = {D: 4, E: index};
-				var endSelection = {D: 2, E: index};
-				var endPointSelection = {D: 0, E: index};
+				var segmentSelection = {F: 4, G: index};
+				var endSelection = {F: 2, G: index};
+				var endPointSelection = {F: 0, G: index};
 				var endPoint = A2(
 					$author$project$Main$viewPoint,
 					A2($author$project$Main$selectionAttributes, builder, endPointSelection),
@@ -11256,18 +11340,18 @@ var $author$project$Main$buildSegment = F2(
 				return _Utils_update(
 					builder,
 					{
-						H: A2(
+						J: A2(
 							$elm$core$List$append,
 							_List_fromArray(
 								[startControlPoint, endControlPoint, endPoint]),
-							builder.H),
-						I: A2($elm$core$List$cons, curveSegment, builder.I)
+							builder.J),
+						K: A2($elm$core$List$cons, curveSegment, builder.K)
 					});
 			case 3:
 				var control = _v1.a.au;
 				var to = _v1.a.f;
-				var segmentSelection = {D: 4, E: index};
-				var endSelection = {D: 0, E: index};
+				var segmentSelection = {F: 4, G: index};
+				var endSelection = {F: 0, G: index};
 				var endPoint = A2(
 					$author$project$Main$viewPoint,
 					A2($author$project$Main$selectionAttributes, builder, endSelection),
@@ -11276,7 +11360,7 @@ var $author$project$Main$buildSegment = F2(
 					$author$project$Main$viewPath,
 					A2($author$project$Main$selectionAttributes, builder, segmentSelection),
 					$author$project$Path$segmentToString(component.af));
-				var controlSelection = {D: 3, E: index};
+				var controlSelection = {F: 3, G: index};
 				var controlPoint = A2(
 					$author$project$Main$viewPoint,
 					A2($author$project$Main$selectionAttributes, builder, controlSelection),
@@ -11284,16 +11368,16 @@ var $author$project$Main$buildSegment = F2(
 				return _Utils_update(
 					builder,
 					{
-						H: A2(
+						J: A2(
 							$elm$core$List$cons,
 							controlPoint,
-							A2($elm$core$List$cons, endPoint, builder.H)),
-						I: A2($elm$core$List$cons, curveSegment, builder.I)
+							A2($elm$core$List$cons, endPoint, builder.J)),
+						K: A2($elm$core$List$cons, curveSegment, builder.K)
 					});
 			case 4:
 				var params = _v1.a;
-				var segmentSelection = {D: 4, E: index};
-				var endSelection = {D: 0, E: index};
+				var segmentSelection = {F: 4, G: index};
+				var endSelection = {F: 0, G: index};
 				var endPoint = A2(
 					$author$project$Main$viewPoint,
 					A2($author$project$Main$selectionAttributes, builder, endSelection),
@@ -11306,14 +11390,14 @@ var $author$project$Main$buildSegment = F2(
 				return _Utils_update(
 					builder,
 					{
-						H: A2(
+						J: A2(
 							$elm$core$List$cons,
 							endPoint,
-							A2($elm$core$List$cons, arcControls, builder.H)),
-						I: A2($elm$core$List$cons, arcSegment, builder.I)
+							A2($elm$core$List$cons, arcControls, builder.J)),
+						K: A2($elm$core$List$cons, arcSegment, builder.K)
 					});
 			default:
-				var segmentSelection = {D: 4, E: index};
+				var segmentSelection = {F: 4, G: index};
 				var closeSegment = A2(
 					$author$project$Main$viewPath,
 					A2($author$project$Main$selectionAttributes, builder, segmentSelection),
@@ -11321,22 +11405,22 @@ var $author$project$Main$buildSegment = F2(
 				return _Utils_update(
 					builder,
 					{
-						I: A2($elm$core$List$cons, closeSegment, builder.I)
+						K: A2($elm$core$List$cons, closeSegment, builder.K)
 					});
 		}
 	});
 var $author$project$Main$initOverlayBuilder = F2(
 	function (config, _v0) {
-		var hovered = _v0.s;
-		var selected = _v0.r;
-		return {aO: config, s: hovered, H: _List_Nil, I: _List_Nil, r: selected};
+		var hovered = _v0.t;
+		var selected = _v0.s;
+		return {aO: config, t: hovered, J: _List_Nil, K: _List_Nil, s: selected};
 	});
 var $author$project$Main$viewOverlay = F2(
 	function (config, path) {
 		var initialBuilder = A2($author$project$Main$initOverlayBuilder, config, path);
 		var indexedComponents = A2($elm$core$List$indexedMap, $elm$core$Tuple$pair, path.z);
 		return function (builder) {
-			return _Utils_ap(builder.I, builder.H);
+			return _Utils_ap(builder.K, builder.J);
 		}(
 			A3($elm$core$List$foldl, $author$project$Main$buildSegment, initialBuilder, indexedComponents));
 	});
@@ -11344,10 +11428,10 @@ var $elm$svg$Svg$Attributes$fillOpacity = _VirtualDom_attribute('fill-opacity');
 var $elm$svg$Svg$Attributes$strokeOpacity = _VirtualDom_attribute('stroke-opacity');
 var $author$project$Main$viewSelectionBox = F2(
 	function (model, selectionStart) {
-		var minY = A2($elm$core$Basics$min, selectionStart.K, model.b.K);
-		var minX = A2($elm$core$Basics$min, selectionStart.J, model.b.J);
-		var width = A2($elm$core$Basics$max, selectionStart.J, model.b.J) - minX;
-		var height = A2($elm$core$Basics$max, selectionStart.K, model.b.K) - minY;
+		var minY = A2($elm$core$Basics$min, selectionStart.E, model.b.E);
+		var minX = A2($elm$core$Basics$min, selectionStart.D, model.b.D);
+		var width = A2($elm$core$Basics$max, selectionStart.D, model.b.D) - minX;
+		var height = A2($elm$core$Basics$max, selectionStart.E, model.b.E) - minY;
 		return A2(
 			$elm$svg$Svg$rect,
 			_List_fromArray(
@@ -11491,8 +11575,8 @@ var $author$project$Main$viewPathStringInput = function (pathString) {
 };
 var $elm$html$Html$p = _VirtualDom_node('p');
 var $author$project$Path$selectionToString = function (_v0) {
-	var index = _v0.E;
-	var element = _v0.D;
+	var index = _v0.G;
+	var element = _v0.F;
 	switch (element) {
 		case 0:
 			return 'EndPoint ' + $elm$core$String$fromInt(index);
@@ -11507,7 +11591,7 @@ var $author$project$Path$selectionToString = function (_v0) {
 	}
 };
 var $author$project$Point$toString = function (point) {
-	return $elm$core$String$fromFloat(point.J) + (',' + $elm$core$String$fromFloat(point.K));
+	return $elm$core$String$fromFloat(point.D) + (',' + $elm$core$String$fromFloat(point.E));
 };
 var $author$project$Main$stateToString = function (state) {
 	switch (state.$) {
