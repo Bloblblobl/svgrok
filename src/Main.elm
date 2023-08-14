@@ -1090,6 +1090,16 @@ viewPoint attributes { x, y } =
     Svg.circle (pointAttributes ++ attributes) []
 
 
+viewArcControls : List (Attribute Msg) -> Path.ArcSegmentParameters -> Svg Msg
+viewArcControls attributes params =
+    let
+        centerPoint : Point
+        centerPoint =
+            Path.arcSegmentCenterPoint params
+    in
+    viewPoint attributes centerPoint
+
+
 {-| Builds a Segment onto an OverlayBuilder by adding all of the relevant Points
 on the Segment as well as the Segment itself to the builder.
 -}
@@ -1210,7 +1220,7 @@ buildSegment ( index, component ) builder =
                 , segments = curveSegment :: builder.segments
             }
 
-        Path.ArcSegment { to } ->
+        Path.ArcSegment params ->
             let
                 segmentSelection : Path.Selection
                 segmentSelection =
@@ -1228,10 +1238,16 @@ buildSegment ( index, component ) builder =
 
                 endPoint : Svg Msg
                 endPoint =
-                    viewPoint (selectionAttributes builder endSelection) to
+                    viewPoint
+                        (selectionAttributes builder endSelection)
+                        params.to
+
+                arcControls : Svg Msg
+                arcControls =
+                    viewArcControls [] params
             in
             { builder
-                | points = endPoint :: builder.points
+                | points = endPoint :: arcControls :: builder.points
                 , segments = arcSegment :: builder.segments
             }
 

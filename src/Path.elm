@@ -1864,6 +1864,190 @@ appendCommand path command =
     { path | components = path.components ++ [ newComponent ] }
 
 
+{-| Return the transformed from Point of an arc segment given its parameters.
+The transformation consists of translating the origin to be the midpoint of the
+line between the from and to points, and then rotating the coordinate system
+so that the axes align with the axes of the ellipse. This is a direct
+implementation of equation F.6.5.1 found in the SVG specification:
+<https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes>
+-}
+arcSegmentTransformedFrom : ArcSegmentParameters -> Point
+arcSegmentTransformedFrom params =
+    let
+        angleRadians : Float
+        angleRadians =
+            degrees params.angle
+
+        halfDiffX : Float
+        halfDiffX =
+            (params.from.x - params.to.x) / 2
+
+        halfDiffY : Float
+        halfDiffY =
+            (params.from.y - params.to.y) / 2
+
+        transformedX : Float
+        transformedX =
+            (cos angleRadians * halfDiffX) + (sin angleRadians * halfDiffY)
+
+        transformedY : Float
+        transformedY =
+            (-(sin angleRadians) * halfDiffX) + (cos angleRadians * halfDiffY)
+    in
+    { x = transformedX, y = transformedY }
+
+
+{-| Return the adjusted radii of an arc segment given its parameters. If the
+radii are too small to create an elliptical arc that matches the remaining
+parameters, they are scaled up until an elliptical arc can be created. This is a
+direct implementation of equation F.6.6 found in the SVG specification:
+<https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes>
+-}
+arcSegmentAdjustedRadii : ArcSegmentParameters -> Point
+arcSegmentAdjustedRadii params =
+    let
+        angleRadians : Float
+        angleRadians =
+            degrees params.angle
+
+        -- F.6.5.1
+        transformedFrom : Point
+        transformedFrom =
+            arcSegmentTransformedFrom params
+
+        -- F.6.6.1
+        absRX : Float
+        absRX =
+            abs params.radii.x
+
+        absRY : Float
+        absRY =
+            abs params.radii.y
+
+        -- F.6.6.2
+        lambdaX : Float
+        lambdaX =
+            (transformedFrom.x ^ 2) / (absRX ^ 2)
+
+        lambdaY : Float
+        lambdaY =
+            (transformedFrom.y ^ 2) / (absRY ^ 2)
+
+        lambda : Float
+        lambda =
+            lambdaX + lambdaY
+    in
+    -- F.6.6.3
+    if lambda <= 1 then
+        { x = absRX, y = absRY }
+
+    else
+        { x = sqrt lambda * absRX, y = sqrt lambda * absRY }
+
+
+{-| Return the center point of an arc segment given its parameters. This is
+a direct implementation of equation F.6.5 found in the SVG specification:
+<https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes>
+-}
+arcSegmentCenterPoint : ArcSegmentParameters -> Point
+arcSegmentCenterPoint params =
+    let
+        angleRadians : Float
+        angleRadians =
+            degrees params.angle
+
+        -- F.6.5.1
+        transformedFrom : Point
+        transformedFrom =
+            arcSegmentTransformedFrom params
+
+        -- F.6.6
+        adjustedRadii : Point
+        adjustedRadii =
+            arcSegmentAdjustedRadii params
+
+        -- F.6.5.2
+        rX : Float
+        rX =
+            adjustedRadii.x
+
+        rY : Float
+        rY =
+            adjustedRadii.y
+
+        coefficientSign : Float
+        coefficientSign =
+            case ( params.size, params.rotation ) of
+                ( Large, Clockwise ) ->
+                    -1
+
+                ( Large, CounterClockwise ) ->
+                    1
+
+                ( Small, Clockwise ) ->
+                    1
+
+                ( Small, CounterClockwise ) ->
+                    -1
+
+        rXtY : Float
+        rXtY =
+            rX ^ 2 * transformedFrom.y ^ 2
+
+        rYtX : Float
+        rYtX =
+            rY ^ 2 * transformedFrom.x ^ 2
+
+        coefficientNumerator : Float
+        coefficientNumerator =
+            rX ^ 2 * rY ^ 2 - rXtY - rYtX
+
+        -- In some cases, most likely due to floating-point rounding errors and
+        -- because its a very small number, the coefficient numerator can be
+        -- negative, which will cause the coefficient to be NaN. This is not
+        -- allowed, so we clamp the value to 0.
+        adjustedCoefficientNumerator : Float
+        adjustedCoefficientNumerator =
+            max 0 coefficientNumerator
+
+        coefficientDenominator : Float
+        coefficientDenominator =
+            rXtY + rYtX
+
+        coefficient : Float
+        coefficient =
+            coefficientSign
+                * sqrt
+                    (adjustedCoefficientNumerator / coefficientDenominator)
+
+        tcX : Float
+        tcX =
+            coefficient * (rX * transformedFrom.y / rY)
+
+        tcY : Float
+        tcY =
+            coefficient * -(rY * transformedFrom.x / rX)
+
+        -- F.6.5.3
+        halfSumX : Float
+        halfSumX =
+            (params.from.x + params.to.x) / 2
+
+        halfSumY : Float
+        halfSumY =
+            (params.from.y + params.to.y) / 2
+
+        centerX : Float
+        centerX =
+            cos angleRadians * tcX - sin angleRadians * tcY + halfSumX
+
+        centerY : Float
+        centerY =
+            sin angleRadians * tcX + cos angleRadians * tcY + halfSumY
+    in
+    { x = centerX, y = centerY }
+
+
 
 -------------------------
 -- TO STRING FUNCTIONS --
