@@ -155,6 +155,11 @@ type ArcSize
     | Small
 
 
+defaultArcSize : ArcSize
+defaultArcSize =
+    Large
+
+
 {-| The rotation of an arc Command (also known as sweep). If Clockwise, the arc
 will sweep clockwise from the start to the end Points. Otherwise, it will sweep
 counterclockwise.
@@ -162,6 +167,11 @@ counterclockwise.
 type ArcRotation
     = Clockwise
     | CounterClockwise
+
+
+defaultArcRotation : ArcRotation
+defaultArcRotation =
+    Clockwise
 
 
 {-| For Move, Line, and SmoothQuadraticCurve CommandTypes.
@@ -2112,6 +2122,18 @@ arcSegmentRadiusYEndPoint params isAdjusted =
             Point.subtract centerPoint radiusYDelta
     in
     radiusYEndPoint
+
+
+{-| Return the minimum radius of an arc segment given the from/to Points.
+-}
+arcSegmentMinimumRadius : Point -> Point -> Float
+arcSegmentMinimumRadius from to =
+    let
+        differenceVector : Point
+        differenceVector =
+            Point.subtract to from
+    in
+    sqrt (differenceVector.x ^ 2 + differenceVector.y ^ 2) / 2
 
 
 
