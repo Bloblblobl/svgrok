@@ -176,7 +176,7 @@ initModel =
     , mouseOffset = Point.zero
     , state = Neutral
     , activeKeys = []
-    , zoomFactor = 1
+    , zoomFactor = 10
     , metaPressed = False
     , undoStack = []
     , redoStack = []
@@ -2446,7 +2446,7 @@ viewDefs =
     let
         gridSize : Int
         gridSize =
-            10
+            5
 
         gridSizeString : String
         gridSizeString =
