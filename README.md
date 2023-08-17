@@ -18,12 +18,12 @@ SVG elements) by providing a visual editor and explanations of the commands.
 - Drawing Mode:
   - Use each commands respective command letter to enter drawing mode for that command type
     - e.g. `M` for Move, `L` for Line, `C` for CubicCurve, etc.
-    - Arc/Close not implemented yet
   - In drawing modes, clicking on the canvas will build up the respective command point by point
+    - A step-by-step preview of the command will appear as you draw it
     - Move, Line, HorizontalLine, VerticalLine, and SmoothQuadraticCurve only require one point, the endpoint
     - CubicCurve requires 3 points; the endpoint and start/end control points
     - SmoothCubicCurve and QuadraticCurve require 2 points; the endpoint and a control point
-    - The segment will not appear until all the points are built up - step-by-step preview coming soon!
+    - Arc requires an endpoint, X/Y radii, an angle, and a selection between Large/Small and Clockwise/Counter-Clockwise
   - Use `X` to exit drawing mode
 
 ### Building Locally
@@ -45,7 +45,7 @@ run `elm make` to build an HTML file with all the JS inlined.
   - Toggle grid on/off
   - UI to change grid increment/size
   - Auto-snap points to grid while enabled
-- [ ] Drawing mode/draw tool **(WIP)**
+- [x] Drawing mode/draw tool
   - Press key corresponding to command letter to enter drawing mode
   - Draw points for command step-by-step
 - [ ] Clean up UI
