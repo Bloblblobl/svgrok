@@ -110,3 +110,10 @@ withinBounds point bounds1 bounds2 =
             max bounds1.y bounds2.y
     in
     minX <= point.x && point.x <= maxX && minY <= point.y && point.y <= maxY
+
+
+{-| Treats the point as a vector and calculates its magnitude.
+-}
+vectorMagnitude : Point -> Float
+vectorMagnitude { x, y } =
+    sqrt (x * x + y * y)

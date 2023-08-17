@@ -341,6 +341,17 @@ handleKeyDown { keyCode } model =
         A ->
             { model | state = Drawing (DrawingArc DrawingArcTo) }
 
+        Z ->
+            let
+                newPath : Path
+                newPath =
+                    Path.appendCommand model.path Path.preFormattedClose
+            in
+            { model
+                | path = newPath
+                , pathString = Path.toString newPath
+            }
+
         X ->
             case model.state of
                 Drawing _ ->
@@ -572,19 +583,53 @@ handleDraw model drawingState =
                     }
 
                 DrawingArcRadiusX { to } ->
+                    let
+                        endState : Path.EndState
+                        endState =
+                            Path.toEndState model.path
+
+                        differenceX : Float
+                        differenceX =
+                            to.x - endState.endPoint.x
+
+                        midX : Float
+                        midX =
+                            endState.endPoint.x + differenceX / 2
+
+                        radiusX : Float
+                        radiusX =
+                            model.mouseOffset.x - midX
+                    in
                     { model
                         | state =
-                            { to = to, radiusX = model.mouseOffset.x }
+                            { to = to, radiusX = radiusX }
                                 |> DrawingArcRadiusY
                                 |> DrawingArc
                                 |> Drawing
                     }
 
                 DrawingArcRadiusY { to, radiusX } ->
+                    let
+                        endState : Path.EndState
+                        endState =
+                            Path.toEndState model.path
+
+                        differenceY : Float
+                        differenceY =
+                            to.y - endState.endPoint.y
+
+                        midY : Float
+                        midY =
+                            endState.endPoint.y + differenceY / 2
+
+                        radiusY : Float
+                        radiusY =
+                            model.mouseOffset.y - midY
+                    in
                     { model
                         | state =
                             { to = to
-                            , radii = { x = radiusX, y = model.mouseOffset.y }
+                            , radii = { x = radiusX, y = radiusY }
                             }
                                 |> DrawingArcAngle
                                 |> DrawingArc
@@ -593,19 +638,33 @@ handleDraw model drawingState =
 
                 DrawingArcAngle { to, radii } ->
                     let
-                        referencePoint : Point
-                        referencePoint =
+                        endPoint : Point
+                        endPoint =
                             (Path.toEndState model.path).endPoint
+
+                        arcSegmentParams : Path.ArcSegmentParameters
+                        arcSegmentParams =
+                            { to = to
+                            , radii = radii
+                            , angle = 0
+                            , size = Path.defaultArcSize
+                            , rotation = Path.defaultArcRotation
+                            , from = endPoint
+                            }
+
+                        centerPoint : Point
+                        centerPoint =
+                            Path.arcSegmentCenterPoint arcSegmentParams
 
                         angleRadians : Float
                         angleRadians =
                             atan2
-                                (model.mouseOffset.y - referencePoint.y)
-                                (model.mouseOffset.x - referencePoint.x)
+                                (model.mouseOffset.y - centerPoint.y)
+                                (model.mouseOffset.x - centerPoint.x)
 
                         angle : Float
                         angle =
-                            angleRadians * 180 / pi
+                            toFloat (round (angleRadians * 180 / pi))
                     in
                     { model
                         | state =
@@ -1629,20 +1688,31 @@ viewArcSizeSelection model { to, radii, angle } =
         largeButton : Html Msg
         largeButton =
             Html.button
-                [ HtmlE.onClick (DrawingArcSizeSelected Path.Large) ]
+                [ HtmlE.onClick (DrawingArcSizeSelected Path.Large)
+                , HtmlA.style "cursor" "pointer"
+                ]
                 [ Html.text "Large" ]
 
         smallButton : Html Msg
         smallButton =
             Html.button
-                [ HtmlE.onClick (DrawingArcSizeSelected Path.Small) ]
+                [ HtmlE.onClick (DrawingArcSizeSelected Path.Small)
+                , HtmlA.style "cursor" "pointer"
+                ]
                 [ Html.text "Small" ]
     in
     Svg.foreignObject
-        [ SvgA.x (String.fromFloat <| centerPoint.x - 50)
-        , SvgA.y (String.fromFloat <| centerPoint.y + 50)
+        [ SvgA.x (String.fromFloat <| centerPoint.x - 55)
+        , SvgA.y (String.fromFloat <| centerPoint.y + 5)
+        , SvgA.width "110"
+        , SvgA.height "25"
         ]
-        [ Html.div [] [ largeButton, smallButton ] ]
+        [ Html.div
+            [ HtmlA.style "display" "flex"
+            , HtmlA.style "gap" "10px"
+            ]
+            [ largeButton, smallButton ]
+        ]
 
 
 viewArcRotationSelection : Model -> DrawingArcRotationParameters -> Svg Msg
@@ -1666,22 +1736,32 @@ viewArcRotationSelection model { to, radii, angle, size } =
         clockwiseButton : Html Msg
         clockwiseButton =
             Html.button
-                [ HtmlE.onClick (DrawingArcRotationSelected Path.Clockwise) ]
-                [ Html.text "CW >" ]
+                [ HtmlE.onClick (DrawingArcRotationSelected Path.Clockwise)
+                , HtmlA.style "cursor" "pointer"
+                ]
+                [ Html.text "CW" ]
 
         counterClockwiseButton : Html Msg
         counterClockwiseButton =
             Html.button
                 [ HtmlE.onClick
                     (DrawingArcRotationSelected Path.CounterClockwise)
+                , HtmlA.style "cursor" "pointer"
                 ]
-                [ Html.text "CCW <" ]
+                [ Html.text "CCW" ]
     in
     Svg.foreignObject
-        [ SvgA.x (String.fromFloat <| centerPoint.x - 50)
-        , SvgA.y (String.fromFloat <| centerPoint.y + 50)
+        [ SvgA.x (String.fromFloat <| centerPoint.x - 55)
+        , SvgA.y (String.fromFloat <| centerPoint.y + 5)
+        , SvgA.width "110"
+        , SvgA.height "25"
         ]
-        [ Html.div [] [ clockwiseButton, counterClockwiseButton ] ]
+        [ Html.div
+            [ HtmlA.style "display" "flex"
+            , HtmlA.style "gap" "10px"
+            ]
+            [ clockwiseButton, counterClockwiseButton ]
+        ]
 
 
 viewDrawingPreview : Model -> DrawingState -> Svg Msg
@@ -2041,12 +2121,8 @@ viewDrawingPreview model drawingState =
                 [ viewPath
                     []
                     (pathEndPointString ++ previewQuadraticCurveString)
-                , viewPath
-                    []
-                    (pathEndPointString ++ previewControlString)
-                , viewPath
-                    []
-                    (previewEndPointString ++ previewControlString)
+                , viewPath [] (pathEndPointString ++ previewControlString)
+                , viewPath [] (previewEndPointString ++ previewControlString)
                 , previewPoint model.mouseOffset
                 , previewPoint smoothControl
                 ]
@@ -2074,9 +2150,7 @@ viewDrawingPreview model drawingState =
                                 )
                     in
                     Svg.g previewAttributes
-                        [ viewPath
-                            []
-                            (pathEndPointString ++ previewArcString)
+                        [ viewPath [] (pathEndPointString ++ previewArcString)
                         , previewPoint model.mouseOffset
                         ]
 
@@ -2132,9 +2206,7 @@ viewDrawingPreview model drawingState =
                                 |> Path.commandToString
                     in
                     Svg.g previewAttributes
-                        [ viewPath
-                            []
-                            (pathEndPointString ++ previewArcString)
+                        [ viewPath [] (pathEndPointString ++ previewArcString)
                         , previewPoint to
                         , viewArcControls [] arcSegmentParams
                         ]
@@ -2187,15 +2259,186 @@ viewDrawingPreview model drawingState =
                                 |> Path.commandToString
                     in
                     Svg.g previewAttributes
-                        [ viewPath
-                            []
-                            (pathEndPointString ++ previewArcString)
+                        [ viewPath [] (pathEndPointString ++ previewArcString)
                         , previewPoint to
                         , viewArcControls [] arcSegmentParams
                         ]
 
-                _ ->
-                    Svg.g [] []
+                DrawingArcAngle { to, radii } ->
+                    let
+                        arcSegmentParams : Path.ArcSegmentParameters
+                        arcSegmentParams =
+                            { to = to
+                            , radii = radii
+                            , angle = 0
+                            , size = Path.defaultArcSize
+                            , rotation = Path.defaultArcRotation
+                            , from = endState.endPoint
+                            }
+
+                        centerPoint : Point
+                        centerPoint =
+                            Path.arcSegmentCenterPoint arcSegmentParams
+
+                        angleRadians : Float
+                        angleRadians =
+                            atan2
+                                (model.mouseOffset.y - centerPoint.y)
+                                (model.mouseOffset.x - centerPoint.x)
+
+                        angle : Float
+                        angle =
+                            angleRadians * 180 / pi
+
+                        arcParams : Path.ArcParameters
+                        arcParams =
+                            { to = to
+                            , radii = radii
+                            , angle = angle
+                            , size = Path.defaultArcSize
+                            , rotation = Path.defaultArcRotation
+                            }
+
+                        previewArcString : String
+                        previewArcString =
+                            arcParams
+                                |> Path.preFormattedArc
+                                |> Path.commandToString
+
+                        previewAngleLine : Svg Msg
+                        previewAngleLine =
+                            Svg.line
+                                [ SvgA.strokeDasharray "2 2"
+                                , SvgA.x1 (String.fromFloat centerPoint.x)
+                                , SvgA.y1 (String.fromFloat centerPoint.y)
+                                , SvgA.x2 (String.fromFloat model.mouseOffset.x)
+                                , SvgA.y2 (String.fromFloat model.mouseOffset.y)
+                                ]
+                                []
+
+                        previewAngleArcScale : Float
+                        previewAngleArcScale =
+                            2
+
+                        previewAngleDifference : Point
+                        previewAngleDifference =
+                            Point.subtract model.mouseOffset centerPoint
+
+                        previewAngleMagnitude : Float
+                        previewAngleMagnitude =
+                            Point.vectorMagnitude previewAngleDifference
+
+                        previewAngleEndPoint : Point
+                        previewAngleEndPoint =
+                            Point.scale
+                                (previewAngleArcScale / previewAngleMagnitude)
+                                previewAngleDifference
+                                |> Point.add centerPoint
+
+                        previewAngleArcParams : Path.ArcParameters
+                        previewAngleArcParams =
+                            { to = previewAngleEndPoint
+                            , radii =
+                                { x = previewAngleArcScale
+                                , y = previewAngleArcScale
+                                }
+                            , angle = 0
+                            , size =
+                                if model.mouseOffset.y < centerPoint.y then
+                                    Path.Large
+
+                                else
+                                    Path.Small
+                            , rotation = Path.Clockwise
+                            }
+
+                        previewAngleStartPoint : Point
+                        previewAngleStartPoint =
+                            { x = centerPoint.x + previewAngleArcScale
+                            , y = centerPoint.y
+                            }
+
+                        previewAngleStartPointString : String
+                        previewAngleStartPointString =
+                            Path.commandToString
+                                (Path.preFormattedMove
+                                    { to = previewAngleStartPoint }
+                                )
+
+                        previewAngleArcString : String
+                        previewAngleArcString =
+                            previewAngleArcParams
+                                |> Path.preFormattedArc
+                                |> Path.commandToString
+
+                        previewAngleArc : List (Svg Msg)
+                        previewAngleArc =
+                            if previewAngleMagnitude < previewAngleArcScale then
+                                []
+
+                            else
+                                [ viewPath
+                                    []
+                                    (String.append
+                                        previewAngleStartPointString
+                                        previewAngleArcString
+                                    )
+                                ]
+                    in
+                    Svg.g previewAttributes
+                        (List.append
+                            previewAngleArc
+                            [ viewPath
+                                []
+                                (pathEndPointString ++ previewArcString)
+                            , previewPoint to
+                            , previewAngleLine
+                            ]
+                        )
+
+                DrawingArcSize params ->
+                    let
+                        arcParams : Path.ArcParameters
+                        arcParams =
+                            { to = params.to
+                            , radii = params.radii
+                            , angle = params.angle
+                            , size = Path.defaultArcSize
+                            , rotation = Path.defaultArcRotation
+                            }
+
+                        previewArcString : String
+                        previewArcString =
+                            arcParams
+                                |> Path.preFormattedArc
+                                |> Path.commandToString
+                    in
+                    Svg.g previewAttributes
+                        [ viewPath [] (pathEndPointString ++ previewArcString)
+                        , viewArcSizeSelection model params
+                        ]
+
+                DrawingArcRotation params ->
+                    let
+                        arcParams : Path.ArcParameters
+                        arcParams =
+                            { to = params.to
+                            , radii = params.radii
+                            , angle = params.angle
+                            , size = params.size
+                            , rotation = Path.defaultArcRotation
+                            }
+
+                        previewArcString : String
+                        previewArcString =
+                            arcParams
+                                |> Path.preFormattedArc
+                                |> Path.commandToString
+                    in
+                    Svg.g previewAttributes
+                        [ viewPath [] (pathEndPointString ++ previewArcString)
+                        , viewArcRotationSelection model params
+                        ]
 
 
 viewDefs : Svg Msg
