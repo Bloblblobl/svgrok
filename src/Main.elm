@@ -21,16 +21,42 @@ import ViewBox exposing (ViewBox)
 
 
 
+--------------
+-- CSS KEYS --
+--------------
+
+
+type alias CssKeys =
+    { ids :
+        { grid : String }
+    , classes :
+        { path : String
+        , point : String
+        , hovered : String
+        , selected : String
+        , gridAxes : String
+        }
+    }
+
+
+css : CssKeys
+css =
+    { ids =
+        { grid = "grid" }
+    , classes =
+        { path = "path"
+        , point = "point"
+        , hovered = "hovered"
+        , selected = "selected"
+        , gridAxes = "grid-axes"
+        }
+    }
+
+
+
 -----------
 -- MODEL --
 -----------
-
-
-type alias OverlayConfig =
-    { default : List (Attribute Msg)
-    , hovered : List (Attribute Msg)
-    , selected : List (Attribute Msg)
-    }
 
 
 type DrawingCubicCurveState
@@ -95,7 +121,6 @@ type alias SavedModel =
 type alias Model =
     { pathString : String
     , path : Path
-    , overlayConfig : OverlayConfig
     , viewBox : ViewBox
     , mouseOffset : Point
     , state : State
@@ -124,54 +149,10 @@ initPath =
     }
 
 
-initOverlayConfig : OverlayConfig
-initOverlayConfig =
-    { default =
-        [ SvgA.stroke "black"
-        , SvgA.fill "none"
-        , SvgA.cursor "pointer"
-        ]
-    , hovered =
-        [ SvgA.stroke "yellow"
-        , SvgA.fill "none"
-        , SvgA.cursor "pointer"
-        ]
-    , selected =
-        [ SvgA.stroke "blue"
-        , SvgA.fill "none"
-        , SvgA.cursor "grab"
-        ]
-    }
-
-
-draggingOverlayConfig : OverlayConfig
-draggingOverlayConfig =
-    { default =
-        [ SvgA.stroke "black"
-        , SvgA.fill "none"
-        , SvgA.cursor "pointer"
-        , SvgA.opacity "0.5"
-        ]
-    , hovered =
-        [ SvgA.stroke "black"
-        , SvgA.fill "none"
-        , SvgA.cursor "pointer"
-        , SvgA.opacity "0.5"
-        ]
-    , selected =
-        [ SvgA.stroke "black"
-        , SvgA.fill "none"
-        , SvgA.cursor "grab"
-        , SvgA.opacity "0.5"
-        ]
-    }
-
-
 initModel : Model
 initModel =
     { pathString = ""
     , path = Path.init
-    , overlayConfig = initOverlayConfig
     , viewBox = ViewBox.init
     , mouseOffset = Point.zero
     , state = Neutral
@@ -1228,18 +1209,16 @@ subscriptions model =
 
 
 type alias OverlayBuilder =
-    { config : OverlayConfig
-    , hovered : Maybe Path.Selection
+    { hovered : Maybe Path.Selection
     , selected : List Path.Selection
     , points : List (Svg Msg)
     , segments : List (Svg Msg)
     }
 
 
-initOverlayBuilder : OverlayConfig -> Path -> OverlayBuilder
-initOverlayBuilder config { hovered, selected } =
-    { config = config
-    , hovered = hovered
+initOverlayBuilder : Path -> OverlayBuilder
+initOverlayBuilder { hovered, selected } =
+    { hovered = hovered
     , selected = selected
     , points = []
     , segments = []
@@ -1259,7 +1238,7 @@ selectionMouseEvents selection =
 {-| Returns a list of Attributes for a Selection from an OverlayBuilder.
 -}
 selectionAttributes : OverlayBuilder -> Path.Selection -> List (Attribute Msg)
-selectionAttributes { config, hovered, selected } selection =
+selectionAttributes { hovered, selected } selection =
     let
         isHovered : Bool
         isHovered =
@@ -1274,22 +1253,21 @@ selectionAttributes { config, hovered, selected } selection =
         isSelected =
             List.member selection selected
     in
-    List.append (selectionMouseEvents selection) <|
-        if isSelected then
-            config.selected
+    if isHovered then
+        SvgA.class css.classes.hovered :: selectionMouseEvents selection
 
-        else if isHovered then
-            config.hovered
+    else if isSelected then
+        SvgA.class css.classes.selected :: selectionMouseEvents selection
 
-        else
-            config.default
+    else
+        selectionMouseEvents selection
 
 
 {-| Renders a Path String as a single SVG <path> element.
 -}
 viewPath : List (Attribute Msg) -> String -> Svg Msg
 viewPath attributes pathString =
-    Svg.path (SvgA.d pathString :: attributes) []
+    Svg.path (SvgA.class css.classes.path :: SvgA.d pathString :: attributes) []
 
 
 {-| Renders a Point as an SVG <circle> element.
@@ -1299,7 +1277,8 @@ viewPoint attributes { x, y } =
     let
         pointAttributes : List (Attribute Msg)
         pointAttributes =
-            [ SvgA.cx (String.fromFloat x)
+            [ SvgA.class css.classes.point
+            , SvgA.cx (String.fromFloat x)
             , SvgA.cy (String.fromFloat y)
             , SvgA.r "0.5"
             ]
@@ -1544,12 +1523,12 @@ buildSegment ( index, component ) builder =
 {-| Renders an overlay of a Path, with separate SVG elements for each Point and
 Segment of the Path.
 -}
-viewOverlay : OverlayConfig -> Path -> List (Svg Msg)
-viewOverlay config path =
+viewOverlay : Path -> List (Svg Msg)
+viewOverlay path =
     let
         initialBuilder : OverlayBuilder
         initialBuilder =
-            initOverlayBuilder config path
+            initOverlayBuilder path
 
         indexedComponents : List ( Int, Path.Component )
         indexedComponents =
@@ -2458,7 +2437,7 @@ viewDefs =
     in
     Svg.defs []
         [ Svg.pattern
-            [ SvgA.id "grid"
+            [ SvgA.id css.ids.grid
             , SvgA.viewBox viewBoxString
             , SvgA.width gridSizeString
             , SvgA.height gridSizeString
@@ -2471,7 +2450,6 @@ viewDefs =
                 , SvgA.y1 "0"
                 , SvgA.x2 gridSizeString
                 , SvgA.y2 "0"
-                , SvgA.stroke "black"
                 ]
                 []
             , Svg.line
@@ -2479,7 +2457,6 @@ viewDefs =
                 , SvgA.y1 "0"
                 , SvgA.x2 "0"
                 , SvgA.y2 gridSizeString
-                , SvgA.stroke "black"
                 ]
                 []
             ]
@@ -2488,13 +2465,12 @@ viewDefs =
 
 viewAxes : Model -> Svg Msg
 viewAxes { viewBox } =
-    Svg.g [ SvgA.opacity "50%", SvgA.strokeWidth "0.5" ]
+    Svg.g [ SvgA.class css.classes.gridAxes ]
         [ Svg.line
             [ SvgA.x1 (String.fromFloat viewBox.minX)
             , SvgA.y1 "0"
             , SvgA.x2 (String.fromFloat (viewBox.minX + viewBox.width))
             , SvgA.y2 "0"
-            , SvgA.stroke "black"
             ]
             []
         , Svg.line
@@ -2502,7 +2478,6 @@ viewAxes { viewBox } =
             , SvgA.y1 (String.fromFloat viewBox.minY)
             , SvgA.x2 "0"
             , SvgA.y2 (String.fromFloat (viewBox.minY + viewBox.height))
-            , SvgA.stroke "black"
             ]
             []
         ]
@@ -2533,7 +2508,7 @@ viewCanvas model =
     let
         baseOverlay : List (Svg Msg)
         baseOverlay =
-            viewOverlay model.overlayConfig model.path
+            viewOverlay model.path
 
         overlay : List (Svg Msg)
         overlay =

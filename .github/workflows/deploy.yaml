@@ -15,10 +15,10 @@ jobs:
       - name: Install Elm and Build SVGrok 🔧
         run: |
           npm install -g elm
-          elm make src/Main.elm --optimize --output=public/index.html
+          bash scripts/build.sh
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: deploy
-          folder: public
+          folder: build
