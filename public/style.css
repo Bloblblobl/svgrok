@@ -15,19 +15,21 @@ body {
 }
 
 .point {
-    stroke: var(--default-color);
+    stroke: none;
+    fill: var(--default-color);
 }
 
 .point.hovered {
-    stroke: var(--hovered-color);
+    fill: var(--hovered-color);
 }
 
 .point.selected {
-    stroke: var(--selected-color);
+    fill: var(--selected-color);
 }
 
 .path {
     stroke: var(--default-color);
+    fill: none;
 }
 
 .path.hovered {
