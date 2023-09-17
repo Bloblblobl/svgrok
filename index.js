@@ -10814,8 +10814,7 @@ var $author$project$Main$viewPoint = F2(
 				$elm$svg$Svg$Attributes$cx(
 				$elm$core$String$fromFloat(x)),
 				$elm$svg$Svg$Attributes$cy(
-				$elm$core$String$fromFloat(y)),
-				$elm$svg$Svg$Attributes$r('0.5')
+				$elm$core$String$fromFloat(y))
 			]);
 		return A2(
 			$elm$svg$Svg$circle,
