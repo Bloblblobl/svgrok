@@ -1280,7 +1280,6 @@ viewPoint attributes { x, y } =
             [ SvgA.class css.classes.point
             , SvgA.cx (String.fromFloat x)
             , SvgA.cy (String.fromFloat y)
-            , SvgA.r "0.5"
             ]
     in
     Svg.circle (pointAttributes ++ attributes) []

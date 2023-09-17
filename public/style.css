@@ -7,16 +7,17 @@
 
 html,
 body {
+    height: 100%;
     margin: 0;
+    overflow: hidden;
     padding: 0;
     width: 100%;
-    height: 100%;
-    overflow: hidden;
 }
 
 .point {
-    stroke: none;
     fill: var(--default-color);
+    r: 1;
+    stroke: none;
 }
 
 .point.hovered {
@@ -28,8 +29,9 @@ body {
 }
 
 .path {
-    stroke: var(--default-color);
     fill: none;
+    stroke: var(--default-color);
+    stroke-width: 0.75;
 }
 
 .path.hovered {
@@ -45,12 +47,12 @@ body {
 }
 
 #grid {
-    stroke: var(--grid-color);
     opacity: 0.25;
+    stroke: var(--grid-color);
 }
 
 .grid-axes {
+    opacity: 0.4;
     stroke: var(--grid-color);
     stroke-width: 0.5;
-    opacity: 0.4;
 }
