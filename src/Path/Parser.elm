@@ -953,3 +953,42 @@ parse commandString =
 
         Err _ ->
             Path.fromComponents []
+
+
+{-| Fold function for trimming Parser Results to only include Valid Results up
+until the first Invalid Result is encountered.
+-}
+trimResultToCommand : Result -> ( Bool, List Command ) -> ( Bool, List Command )
+trimResultToCommand result ( foundInvalid, commands ) =
+    if foundInvalid then
+        ( foundInvalid, commands )
+
+    else
+        case result of
+            Valid command ->
+                ( False, command :: commands )
+
+            Invalid _ ->
+                ( True, commands )
+
+
+{-| Parses a command string into a Path. Ignores any remaining Parser Results
+once the first Invalid Result is encountered.
+-}
+parseAndTrim : String -> Path
+parseAndTrim commandString =
+    case P.run builderLoop commandString of
+        Ok builder ->
+            finishBuilder builder
+                |> List.reverse
+                |> List.foldl trimResultToCommand ( False, [] )
+                |> Tuple.second
+                |> List.reverse
+                |> Path.buildComponents
+                |> List.map .segment
+                |> List.map Path.segmentToAbsoluteExplicitCommand
+                |> Path.buildComponents
+                |> Path.fromComponents
+
+        Err _ ->
+            Path.fromComponents []

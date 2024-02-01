@@ -2137,6 +2137,130 @@ arcSegmentMinimumRadius from to =
 
 
 
+------------------------------
+-- TRANSFORMATION FUNCTIONS --
+------------------------------
+
+
+{-| Creates an absolute, explicit Command from a Segment, meaning that the
+Command will have the Absolute relation, will not be part of an implicit
+sequence, and will be one of the fully expanded types (M, L, C, Q, A, Z).
+-}
+segmentToAbsoluteExplicitCommand : Segment -> Command
+segmentToAbsoluteExplicitCommand segment =
+    case segment of
+        MoveSegment { to } ->
+            preFormattedMove { to = to }
+
+        LineSegment { to } ->
+            preFormattedLine { to = to }
+
+        CubicCurveSegment { startControl, endControl, to } ->
+            preFormattedCubicCurve
+                { startControl = startControl
+                , endControl = endControl
+                , to = to
+                }
+
+        QuadraticCurveSegment { control, to } ->
+            preFormattedQuadraticCurve { control = control, to = to }
+
+        ArcSegment { radii, angle, size, rotation, to } ->
+            preFormattedArc
+                { radii = radii
+                , angle = angle
+                , size = size
+                , rotation = rotation
+                , to = to
+                }
+
+        CloseSegment _ ->
+            preFormattedClose
+
+
+{-| Transforms a Path into an absolute, explicit Path, meaning that it will not
+include any implicit sequences of Commands, and that all Commands will have the
+Absolute relation and will be one of the fully expanded types (M, L, C, Q, A,
+Z).Ï
+-}
+toAbsoluteExplicitPath : Path -> Path
+toAbsoluteExplicitPath { components } =
+    components
+        |> List.map .segment
+        |> List.map segmentToAbsoluteExplicitCommand
+        |> buildComponents
+        |> fromComponents
+
+
+{-| Scales the parameters of a Segment by the given factors.
+-}
+scaleSegment : Float -> Float -> Segment -> Segment
+scaleSegment xFactor yFactor segment =
+    let
+        scalePoint : Point -> Point
+        scalePoint point =
+            Point.scaleXY xFactor yFactor point
+    in
+    case segment of
+        MoveSegment { from, to } ->
+            MoveSegment
+                { from = scalePoint from
+                , to = scalePoint to
+                }
+
+        LineSegment { from, to } ->
+            LineSegment
+                { from = scalePoint from
+                , to = scalePoint to
+                }
+
+        CubicCurveSegment { startControl, endControl, from, to } ->
+            CubicCurveSegment
+                { startControl = scalePoint startControl
+                , endControl = scalePoint endControl
+                , from = scalePoint from
+                , to = scalePoint to
+                }
+
+        QuadraticCurveSegment { control, from, to } ->
+            QuadraticCurveSegment
+                { control = scalePoint control
+                , from = scalePoint from
+                , to = scalePoint to
+                }
+
+        ArcSegment { radii, angle, size, rotation, from, to } ->
+            ArcSegment
+                { radii = scalePoint radii
+                , angle = angle
+                , size = size
+                , rotation = rotation
+                , from = scalePoint from
+                , to = scalePoint to
+                }
+
+        CloseSegment { from, to } ->
+            CloseSegment
+                { from = scalePoint from
+                , to = scalePoint to
+                }
+
+
+{-| Scales a Path by the given factors. For example, if both factors are 0.5, it
+will be scaled down to half its size.
+-}
+scale : Float -> Float -> Path -> Path
+scale xFactor yFactor path =
+    path.components
+        |> List.map .segment
+        |> List.map (scaleSegment xFactor yFactor)
+        -- TODO: Convert directly from segments to components
+        |> List.map segmentToAbsoluteExplicitCommand
+        |> buildComponents
+        |> fromComponents
+
+
+
 -------------------------
 -- TO STRING FUNCTIONS --
 -------------------------

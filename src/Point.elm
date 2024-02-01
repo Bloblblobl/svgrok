@@ -35,6 +35,17 @@ scale factor { x, y } =
     }
 
 
+{-| Scales a point's x and y coordinates separately by the provided factors. The
+x and y values of the result are the given factors times the original respective
+x and y values.
+-}
+scaleXY : Float -> Float -> Point -> Point
+scaleXY xFactor yFactor { x, y } =
+    { x = xFactor * x
+    , y = yFactor * y
+    }
+
+
 {-| Returns the sum of the two given points.
 The x and y values of the result are the sum of the x and y values of the two
 given points.
